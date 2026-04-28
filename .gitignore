@@ -1,5 +1,7 @@
 # build folder
 build/
+# miselaneous
+.DS_Store
 
 # Prerequisites
 *.d
