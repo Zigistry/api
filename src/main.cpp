@@ -2,8 +2,36 @@
 // doing #include <crow.h> works,
 // but added this to maintain cross-platformity
 #include "../include/crow_all.h"
+#include <string>
 
-std::string search_packages() { return "Hello, world"; }
+crow::response search_packages(const crow::request &req) {
+  const char *raw_search_query = req.url_params.get("q");
+  const char *raw_page = req.url_params.get("page");
+  const char *raw_per_page = req.url_params.get("per_page");
+
+  if (raw_search_query == NULL || raw_page == NULL || raw_per_page == NULL) {
+    crow::json::wvalue error_responce;
+    error_responce["error"] = "Parameters needed: q, page and per_page.";
+    return crow::response(error_responce);
+  }
+  std::string search_query;
+  unsigned int page;
+  unsigned short per_page;
+  try {
+    search_query = raw_per_page;
+    page = std::stoi(raw_page);
+    per_page = std::stoi(raw_per_page);
+  } catch {
+    crow::json::wvalue error_responce;
+    error_responce["error"] = "Parameters are not in the correct format";
+    return crow::response(error_responce);
+  }
+
+  
+  
+  crow::json::wvalue normal_responce;
+  return crow::response(normal_responce);
+}
 
 int main() {
   const char *database_url = getenv("DATABASE_URL");
