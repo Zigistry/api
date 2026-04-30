@@ -25,6 +25,18 @@ int main() {
       .synced = true,
   });
 
+  if (db.err) {
+    fprintf(stderr, "Error: %s\n", libsql_error_message(db.err));
+    return 1;
+  }
+  libsql_connection_t database_connection = libsql_database_connect(db);
+  printf("CONNECTED!!!!\n");
+  if (database_connection.err) {
+    fprintf(stderr, "Connection error: %s\n",
+            libsql_error_message(database_connection.err));
+    return 1;
+  }
+
   crow::SimpleApp app;
 
   CROW_ROUTE(app, "/search/packages/")(search_packages);

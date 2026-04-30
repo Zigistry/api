@@ -3,9 +3,11 @@ BINARY_NAME = server
 BUILD_FOLDER = build
 
 SRC = src/main.cpp
+TARGET = $(BUILD_FOLDER)/$(BINARY_NAME)
 FLAGS = -Linclude -lsql
 
-
-build:
+$(TARGET): $(SRC)
 	mkdir -p $(BUILD_FOLDER)
-	$(COMPILER) $(SRC) -o $(BUILD_FOLDER)/$(BINARY_NAME) $(FLAGS)
+	$(COMPILER) $(SRC) -o $(TARGET) $(FLAGS)
+
+build: $(TARGET)

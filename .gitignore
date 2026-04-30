@@ -3,6 +3,9 @@ build/
 # miselaneous
 .DS_Store
 
+# database
+*.db*
+.env
 # Prerequisites
 *.d
 
