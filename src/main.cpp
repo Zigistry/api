@@ -2,6 +2,7 @@
 // doing #include <crow.h> works,
 // but added this to maintain cross-platformity
 #include "../include/crow_all.h"
+#include <climits>
 #include <string>
 
 crow::response search_packages(const crow::request &req) {
@@ -9,26 +10,48 @@ crow::response search_packages(const crow::request &req) {
   const char *raw_page = req.url_params.get("page");
   const char *raw_per_page = req.url_params.get("per_page");
 
-  if (raw_search_query == NULL || raw_page == NULL || raw_per_page == NULL) {
+  if (raw_search_query == NULL or raw_page == NULL or raw_per_page == NULL) {
     crow::json::wvalue error_responce;
     error_responce["error"] = "Parameters needed: q, page and per_page.";
     return crow::response(error_responce);
   }
   std::string search_query;
-  unsigned int page;
-  unsigned short per_page;
+  unsigned long page;
+  unsigned long per_page;
   try {
     search_query = raw_per_page;
-    page = std::stoi(raw_page);
-    per_page = std::stoi(raw_per_page);
-  } catch {
+    page = std::stoul(raw_page);
+    per_page = std::stoul(raw_per_page);
+  } catch (...) {
     crow::json::wvalue error_responce;
     error_responce["error"] = "Parameters are not in the correct format";
     return crow::response(error_responce);
   }
 
-  
-  
+  if (per_page > 10) {
+    crow::json::wvalue error_responce;
+    error_responce["error"] = "per_page can't be greater than 10";
+    return crow::response(error_responce);
+  }
+
+  if (search_query.length() > 200) {
+    crow::json::wvalue error_responce;
+    error_responce["error"] = "Search query length can't be greater than 200";
+    return crow::response(error_responce);
+  }
+
+
+  if (page != 0 and per_page > INT_MAX / page) {
+    // I thought, if we do a * b,
+    // and it turns out to be larger
+    // than what int can store?
+    // this is just a check for checking
+    // if long * long < INT_MAX
+    crow::json::wvalue error_responce;
+    error_responce["error"] = "Very long integers";
+    return crow::response(error_responce);
+  }
+
   crow::json::wvalue normal_responce;
   return crow::response(normal_responce);
 }
