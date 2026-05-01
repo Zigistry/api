@@ -116,18 +116,58 @@ crow::response search_packages(const crow::request& req)
     // i.e ceil(7.5) -> 8
     const float pages_needed_in_decimal = (float)total_results / per_page;
 
-    
     const unsigned long total_pages = std::ceil(pages_needed_in_decimal);
 
     // either the first page, or the requested one
     // also, to make sure page is in range
     const unsigned long page_needed = std::max(1ul, std::min(total_pages, page));
 
-    
     const unsigned long offset = (page_needed - 1) * per_page;
 
-    
+    const std::string search_packages_database_query = std::format(R"""(
 
+
+        SELECT
+            repos.id, users.avatar_id, repos.owner, repos.platform, repos.description,
+            repos.issues_count, repos.default_branch_name, repos.fork_count,
+            repos.stargazer_count, repos.watchers_count, repos.pushed_at, repos.created_at,
+            repos.is_archived, repos.is_disabled, repos.is_fork, repos.license,
+            repos.primary_language,
+            (
+                SELECT minimum_zig_version FROM releases
+                WHERE repo_id = repos.id AND version = "__ZIGISTRY__DEFAULT__BRANCH__"
+            ) AS minimum_zig_version,
+
+            (
+                SELECT COUNT(*) FROM repo_dependents
+                WHERE repo_id = repos.id
+            ) AS dependents_count
+        FROM repos
+    	  LEFT JOIN users ON repos.owner = users.id
+        WHERE repos.is_disabled = 0
+  
+        AND EXISTS (
+            SELECT 1 FROM packages
+            WHERE packages.repo_id = repos.id
+        )
+  
+        AND (
+            EXISTS (
+                SELECT 1 FROM repo_search
+                WHERE repo_search.repo_id = repos.id
+                AND repo_search.keywords MATCH {}
+            )
+            OR repos.id LIKE {}
+            OR repos.owner LIKE {}
+            OR repos.description LIKE {}
+            OR repos.primary_language LIKE {}
+        )
+        ORDER BY repos.stargazer_count DESC
+        LIMIT {} OFFSET {};
+
+
+    )""",
+        query, query, query, query, query, per_page, offset);
 
     crow::json::wvalue normal_responce;
     return crow::response(normal_responce);
