@@ -6,7 +6,9 @@
 #include <cmath>
 #include <string>
 
-#define GET_ROW(A, B)
+#define GET_ROW_UL(A, B) ((unsigned int)libsql_row_value((A), (B)).ok.value.integer)
+#define GET_ROW_TEXT(A, B) std::string(libsql_row_value((A), (B)).ok.value.text.ptr, libsql_row_value((A), (B)).ok.value.text.len)
+
 
 libsql_connection_t database_connection;
 
@@ -146,8 +148,16 @@ crow::response search_packages(const crow::request& req)
         if (libsql_row_empty(row)) {
             break;
         }
+
+        crow::json::wvalue item;
+        
+        item["id"] = GET_ROW_TEXT(row, 0).ptr;
+        item["avatar_url"] = GET_ROW_TEXT(row, 1).ptr;
+        item["owner_name"] = GET_ROW_TEXT(row, 2).ptr;
+        // item["provider"] = (std::string)(GET_ROW_TEXT(row, 3).ptr, GET_ROW_TEXT(row, 3).len) == "gh" ? "github" : "codeberg";
+
         if (!if_read) {
-            total_results = (unsigned int)libsql_row_value(row, 19).ok.value.integer;
+            total_results = GET_ROW_UL(row, 19);
             if_read = true;
         }
     }
@@ -155,6 +165,8 @@ crow::response search_packages(const crow::request& req)
     auto end = std::chrono::steady_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+
+    normal_responce["items"] = 
 
     normal_responce["total"] = total_results;
     normal_responce["page"] = page;
