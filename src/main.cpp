@@ -3,9 +3,7 @@
 // but added this to maintain cross-platformity
 #include "../include/crow_all.h"
 #include <algorithm>
-#include <climits>
 #include <cmath>
-#include <cstdint>
 #include <string>
 
 #define GET_ROW(A, B)
@@ -29,18 +27,14 @@ crow::response search_packages(const crow::request& req)
     unsigned long per_page;
     try {
         search_query = raw_search_query;
-        page = std::max(std::stoul(raw_page), 0ul);
-        per_page = std::max(std::stoul(raw_per_page), 0ul);
+        page = std::max(std::stoul(raw_page), 1ul);
+        per_page = std::max(std::stoul(raw_per_page), 1ul);
+
+        per_page = std::min(per_page, 10UL);
+        page = std::min(page, 1000000UL);
     } catch (...) {
         crow::json::wvalue error_responce;
         error_responce["error"] = "Parameters are not in the correct format";
-        return crow::response(error_responce);
-    }
-
-    std::string like_query = "%" + search_query + "%";
-    if (per_page > 10) {
-        crow::json::wvalue error_responce;
-        error_responce["error"] = "per_page can't be greater than 10";
         return crow::response(error_responce);
     }
 
@@ -50,46 +44,28 @@ crow::response search_packages(const crow::request& req)
         return crow::response(error_responce);
     }
 
-    if (page - 10 != 0 and per_page > INT_MAX / page - 10) {
-        // I thought, if we do a * b,
-        // and it turns out to be larger
-        // than what int can store?
-        // this is just a check for checking
-        // if long * long < INT_MAX
-        crow::json::wvalue error_responce;
-        error_responce["error"] = "Very long integers";
-        return crow::response(error_responce);
-    }
+    
 
-    const unsigned int start_index = page * per_page;
-    const unsigned int end_index = start_index + per_page;
-
-    // this will convert something like:
-    // hello
-    // into:
-    // '%hello%'
+    std::string like_query = "%" + search_query + "%";
 
     std::string search_packages_count_query = R"""(
 
-
-            SELECT COUNT(*) FROM repos
-            WHERE is_disabled = 0
-            
-            AND EXISTS (
-                SELECT 1 FROM packages WHERE packages.repo_id = repos.id
-            )
-
+            SELECT COUNT(*)
+            FROM repos r
+            WHERE r.is_disabled = 0
             AND (
                 EXISTS (
                     SELECT 1 FROM repo_search
-                    WHERE repo_search.repo_id = repos.id
-                    AND keywords MATCH ?
+                    WHERE keywords MATCH ?
                 )
-
-                OR repos.id LIKE ?
-                OR repos.owner LIKE ?
-                OR repos.description LIKE ?
-                OR repos.primary_language LIKE ?
+                OR r.id LIKE ?
+                OR r.owner LIKE ?
+                OR r.description LIKE ?
+                OR r.primary_language LIKE ?
+            )
+            AND EXISTS (
+                SELECT 1 FROM packages p
+                WHERE p.repo_id = r.id
             );
 
 
@@ -129,11 +105,6 @@ crow::response search_packages(const crow::request& req)
         return crow::response(error_responce);
     }
 
-    // if (total_results == 0) {
-    //     crow::json::wvalue empty_responce;
-    //     return crow::response(empty_responce);
-    // }
-
     // here, we can get like, 75 / 10
     // i.e 7.5, hence this would require 8 pages.
     // i.e ceil(7.5) -> 8
@@ -143,52 +114,56 @@ crow::response search_packages(const crow::request& req)
 
     // either the first page, or the requested one
     // also, to make sure page is in range
-    const unsigned long page_needed = std::max(1ul, std::min(total_pages, page));
+    // total_pages can become 0
+    const unsigned long page_needed = std::max(1UL, std::min(total_pages, page));
 
     const unsigned long offset = (page_needed - 1) * per_page;
 
     const std::string search_packages_database_query = R"""(
 
+    SELECT
+        r.id, u.avatar_id, r.owner, r.platform, r.description,
+        r.issues_count, r.default_branch_name, r.fork_count,
+        r.stargazer_count, r.watchers_count, r.pushed_at, r.created_at,
+        r.is_archived, r.is_disabled, r.is_fork, r.license,
+        r.primary_language,
+    (
+        SELECT minimum_zig_version
+        FROM releases
+        WHERE repo_id = r.id
+        AND version = '__ZIGISTRY__DEFAULT__BRANCH__'
+        LIMIT 1
+    ) AS minimum_zig_version,
+    (
+        SELECT COUNT(*)
+        FROM repo_dependents d
+        WHERE d.repo_id = r.id
+    ) AS dependents_count
 
-        SELECT
-            repos.id, users.avatar_id, repos.owner, repos.platform, repos.description,
-            repos.issues_count, repos.default_branch_name, repos.fork_count,
-            repos.stargazer_count, repos.watchers_count, repos.pushed_at, repos.created_at,
-            repos.is_archived, repos.is_disabled, repos.is_fork, repos.license,
-            repos.primary_language,
-            (
-                SELECT minimum_zig_version FROM releases
-                WHERE repo_id = repos.id AND version = '__ZIGISTRY__DEFAULT__BRANCH__'
-            ) AS minimum_zig_version,
-
-            (
-                SELECT COUNT(*) FROM repo_dependents
-                WHERE repo_id = repos.id
-            ) AS dependents_count
-        FROM repos
-    	  LEFT JOIN users ON repos.owner = users.id
-        WHERE repos.is_disabled = 0
-  
-        AND EXISTS (
-            SELECT 1 FROM packages
-            WHERE packages.repo_id = repos.id
+    FROM repos r
+    LEFT JOIN users u ON r.owner = u.id
+    WHERE r.is_disabled = 0
+      AND EXISTS (
+      SELECT 1
+      FROM packages p
+      WHERE p.repo_id = r.id
+    )
+    AND (
+        r.id IN (
+            SELECT repo_id
+            FROM repo_search
+            WHERE keywords MATCH ?
         )
-  
-        AND (
-            EXISTS (
-                SELECT 1 FROM repo_search
-                WHERE repo_search.repo_id = repos.id
-                AND repo_search.keywords MATCH ?
-            )
-            OR repos.id LIKE ?
-            OR repos.owner LIKE ?
-            OR repos.description LIKE ?
-            OR repos.primary_language LIKE ?
-        )
-        ORDER BY repos.stargazer_count DESC
-        LIMIT ? OFFSET ?;
+        OR r.id LIKE ?
+        OR r.owner LIKE ?
+        OR r.description LIKE ?
+        OR r.primary_language LIKE ?
+    )
+    GROUP BY r.id
+    LIMIT ? OFFSET ?;
 
 
+       
     )""";
 
     const libsql_statement_t query_stmt = libsql_connection_prepare(database_connection, search_packages_database_query.c_str());
