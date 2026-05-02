@@ -5,12 +5,16 @@
 #include <algorithm>
 #include <climits>
 #include <cmath>
+#include <cstdint>
 #include <string>
+
+#define GET_ROW(A, B)
 
 libsql_connection_t database_connection;
 
 crow::response search_packages(const crow::request& req)
 {
+    auto start = std::chrono::steady_clock::now();
     const char* raw_search_query = req.url_params.get("q");
     const char* raw_page = req.url_params.get("page");
     const char* raw_per_page = req.url_params.get("per_page");
@@ -24,15 +28,16 @@ crow::response search_packages(const crow::request& req)
     unsigned long page;
     unsigned long per_page;
     try {
-        search_query = raw_per_page;
-        page = std::stoul(raw_page);
-        per_page = std::stoul(raw_per_page);
+        search_query = raw_search_query;
+        page = std::max(std::stoul(raw_page), 0ul);
+        per_page = std::max(std::stoul(raw_per_page), 0ul);
     } catch (...) {
         crow::json::wvalue error_responce;
         error_responce["error"] = "Parameters are not in the correct format";
         return crow::response(error_responce);
     }
 
+    std::string like_query = "%" + search_query + "%";
     if (per_page > 10) {
         crow::json::wvalue error_responce;
         error_responce["error"] = "per_page can't be greater than 10";
@@ -64,9 +69,7 @@ crow::response search_packages(const crow::request& req)
     // into:
     // '%hello%'
 
-    const std::string query = std::format("'%{}%'", search_query);
-
-    std::string search_packages_count_query = std::format(R"""(
+    std::string search_packages_count_query = R"""(
 
 
             SELECT COUNT(*) FROM repos
@@ -80,21 +83,33 @@ crow::response search_packages(const crow::request& req)
                 EXISTS (
                     SELECT 1 FROM repo_search
                     WHERE repo_search.repo_id = repos.id
-                    AND keywords MATCH {}
+                    AND keywords MATCH ?
                 )
 
-                OR repos.id LIKE {}
-                OR repos.owner LIKE {}
-                OR repos.description LIKE {}
-                OR repos.primary_language LIKE {}
+                OR repos.id LIKE ?
+                OR repos.owner LIKE ?
+                OR repos.description LIKE ?
+                OR repos.primary_language LIKE ?
             );
 
 
-    )""",
-        query, query, query, query, query);
+    )""";
 
     const libsql_statement_t count_stmt = libsql_connection_prepare(
         database_connection, search_packages_count_query.c_str());
+    libsql_statement_bind_value(
+        count_stmt,
+        libsql_text(
+            search_query.c_str(),
+            search_query.length()));
+
+    for (int i = 0; i < 4; i++) {
+        libsql_statement_bind_value(
+            count_stmt,
+            libsql_text(
+                like_query.c_str(),
+                like_query.length()));
+    }
 
     unsigned int total_results = 0;
 
@@ -103,13 +118,21 @@ crow::response search_packages(const crow::request& req)
         const libsql_row_t count_row = libsql_rows_next(count_rows);
         if (not count_row.err and not libsql_row_empty(count_row)) {
             total_results = (unsigned int)libsql_row_value(count_row, 0).ok.value.integer;
+        } else {
+            crow::json::wvalue error_responce;
+            error_responce["error"] = "Problem with server.4";
+            return crow::response(error_responce);
         }
+    } else {
+        crow::json::wvalue error_responce;
+        error_responce["error"] = "Problem with server.3";
+        return crow::response(error_responce);
     }
 
-    if (total_results == 0) {
-        crow::json::wvalue empty_responce;
-        return crow::response(empty_responce);
-    }
+    // if (total_results == 0) {
+    //     crow::json::wvalue empty_responce;
+    //     return crow::response(empty_responce);
+    // }
 
     // here, we can get like, 75 / 10
     // i.e 7.5, hence this would require 8 pages.
@@ -124,7 +147,7 @@ crow::response search_packages(const crow::request& req)
 
     const unsigned long offset = (page_needed - 1) * per_page;
 
-    const std::string search_packages_database_query = std::format(R"""(
+    const std::string search_packages_database_query = R"""(
 
 
         SELECT
@@ -135,7 +158,7 @@ crow::response search_packages(const crow::request& req)
             repos.primary_language,
             (
                 SELECT minimum_zig_version FROM releases
-                WHERE repo_id = repos.id AND version = "__ZIGISTRY__DEFAULT__BRANCH__"
+                WHERE repo_id = repos.id AND version = '__ZIGISTRY__DEFAULT__BRANCH__'
             ) AS minimum_zig_version,
 
             (
@@ -155,21 +178,83 @@ crow::response search_packages(const crow::request& req)
             EXISTS (
                 SELECT 1 FROM repo_search
                 WHERE repo_search.repo_id = repos.id
-                AND repo_search.keywords MATCH {}
+                AND repo_search.keywords MATCH ?
             )
-            OR repos.id LIKE {}
-            OR repos.owner LIKE {}
-            OR repos.description LIKE {}
-            OR repos.primary_language LIKE {}
+            OR repos.id LIKE ?
+            OR repos.owner LIKE ?
+            OR repos.description LIKE ?
+            OR repos.primary_language LIKE ?
         )
         ORDER BY repos.stargazer_count DESC
-        LIMIT {} OFFSET {};
+        LIMIT ? OFFSET ?;
 
 
-    )""",
-        query, query, query, query, query, per_page, offset);
+    )""";
+
+    const libsql_statement_t query_stmt = libsql_connection_prepare(database_connection, search_packages_database_query.c_str());
+
+    libsql_statement_bind_value(
+        query_stmt,
+        libsql_text(
+            search_query.c_str(),
+            search_query.length()));
+    for (int i = 0; i < 4; i++) {
+        libsql_statement_bind_value(
+            query_stmt,
+            libsql_text(
+                like_query.c_str(),
+                like_query.length()));
+    }
+    libsql_statement_bind_value(
+        query_stmt,
+        libsql_integer(
+            per_page));
+
+    libsql_statement_bind_value(
+        query_stmt,
+        libsql_integer(
+            offset));
+
+    if (query_stmt.err) {
+        std::cout << libsql_error_message(query_stmt.err) << std::endl;
+        crow::json::wvalue error_responce;
+        error_responce["error"] = "Problem with server. 1";
+        return crow::response(error_responce);
+    }
+
+    const libsql_rows_t rows = libsql_statement_query(query_stmt);
+
+    if (rows.err) {
+        crow::json::wvalue error_responce;
+        error_responce["error"] = "Problem with server. 5";
+        return crow::response(error_responce);
+    }
 
     crow::json::wvalue normal_responce;
+
+    while (true) {
+        libsql_row_t row;
+        if ((row = libsql_rows_next(rows)).err) {
+            crow::json::wvalue error_responce;
+            error_responce["error"] = "Problem with server.";
+            return crow::response(error_responce);
+        }
+
+        if (libsql_row_empty(row)) {
+            break;
+        }
+    }
+
+    auto end = std::chrono::steady_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+
+    normal_responce["total"] = total_results;
+    normal_responce["page"] = page;
+    normal_responce["per_page"] = per_page;
+    normal_responce["total_pages"] = total_pages;
+    normal_responce["time_took_to_search_ns"] = duration.count();
+
     return crow::response(normal_responce);
 }
 

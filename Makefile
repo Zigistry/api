@@ -4,7 +4,7 @@ BUILD_FOLDER = build
 
 SRC = src/main.cpp
 TARGET = $(BUILD_FOLDER)/$(BINARY_NAME)
-FLAGS = -Linclude -lsql
+FLAGS = -Linclude -lsql -std=c++23
 
 $(TARGET): $(SRC)
 	mkdir -p $(BUILD_FOLDER)
