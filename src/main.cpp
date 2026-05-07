@@ -12,7 +12,8 @@
 inline std::string get_row_text(libsql_row_t row, int col)
 {
     auto v = libsql_row_value(row, col);
-    if (v.ok.type != LIBSQL_TYPE_TEXT) return "";
+    if (v.ok.type != LIBSQL_TYPE_TEXT)
+        return "";
     const char* p = static_cast<const char*>(v.ok.value.text.ptr);
     return std::string(p, static_cast<std::size_t>(v.ok.value.text.len));
 }
@@ -158,8 +159,23 @@ crow::response search_packages(const crow::request& req)
         item["id"] = get_row_text(row, 0);
         item["avatar_url"] = get_row_text(row, 1);
         item["owner_name"] = get_row_text(row, 2);
-        // item["provider"] = (std::string)(GET_ROW_TEXT(row, 3).ptr, GET_ROW_TEXT(row, 3).len) == "gh" ? "github" : "codeberg";
-        //
+        item["description"] = get_row_text(row, 4);
+        item["platform"] = get_row_text(row, 3);
+        item["issues_count"] = GET_ROW_UL(row, 5);
+        item["default_branch_name"] = get_row_text(row, 6);
+        item["fork_count"] = GET_ROW_UL(row, 7);
+        item["stargazer_count"] = GET_ROW_UL(row, 8);
+        item["watchers_count"] = GET_ROW_UL(row, 9);
+        item["pushed_at"] = get_row_text(row, 10);
+        item["created_at"] = get_row_text(row, 11);
+        item["is_archived"] = GET_ROW_UL(row, 12);
+        item["is_disabled"] = GET_ROW_UL(row, 13);
+        item["is_fork"] = GET_ROW_UL(row, 14);
+        item["license"] = get_row_text(row, 15);
+        item["primary_language"] = get_row_text(row, 16);
+        item["minimum_zig_version"] = get_row_text(row, 17);
+        item["dependents_count"] = GET_ROW_UL(row, 18);
+
         items.push_back(item);
         if (!if_read) {
             total_results = GET_ROW_UL(row, 19);
@@ -218,7 +234,14 @@ int main()
         return 1;
     }
 
-    crow::SimpleApp app;
+     crow::App<crow::CORSHandler> app;
+
+    auto& cors = app.get_middleware<crow::CORSHandler>();
+    cors.global()
+        .origin("*")
+        .methods("GET"_method, "POST"_method, "OPTIONS"_method)
+        .headers("Content-Type", "Authorization");
+
     CROW_ROUTE(app, "/search/packages/")(search_packages);
-    app.port(3000).multithreaded().run();
+    app.port(7860).multithreaded().run();
 }
