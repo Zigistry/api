@@ -4,11 +4,18 @@
 #include "../include/crow_all.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <string>
 
 #define GET_ROW_UL(A, B) ((unsigned int)libsql_row_value((A), (B)).ok.value.integer)
-#define GET_ROW_TEXT(A, B) std::string(libsql_row_value((A), (B)).ok.value.text.ptr, libsql_row_value((A), (B)).ok.value.text.len)
 
+inline std::string get_row_text(libsql_row_t row, int col)
+{
+    auto v = libsql_row_value(row, col);
+    if (v.ok.type != LIBSQL_TYPE_TEXT) return "";
+    const char* p = static_cast<const char*>(v.ok.value.text.ptr);
+    return std::string(p, static_cast<std::size_t>(v.ok.value.text.len));
+}
 
 libsql_connection_t database_connection;
 
@@ -47,8 +54,7 @@ crow::response search_packages(const crow::request& req)
         return crow::response(error_responce);
     }
 
-    std::string like_query = "%" + search_query + "%";
-
+    search_query += "*";
     const unsigned long offset = (page - 1) * per_page;
 
     const std::string search_packages_database_query = R"""(
@@ -61,10 +67,6 @@ crow::response search_packages(const crow::request& req)
                   AND EXISTS (SELECT 1 FROM packages p WHERE p.repo_id = r.id)
                   AND (
                       r.id IN (SELECT repo_id FROM repo_search WHERE keywords MATCH ?)
-                      OR r.id LIKE ?
-                      OR r.owner LIKE ?
-                      OR r.description LIKE ?
-                      OR r.primary_language LIKE ?
                   )
             ),
             paged AS MATERIALIZED (
@@ -95,18 +97,18 @@ crow::response search_packages(const crow::request& req)
 
     const libsql_statement_t query_stmt = libsql_connection_prepare(database_connection, search_packages_database_query.c_str());
 
+    if (query_stmt.err) {
+        std::cout << libsql_error_message(query_stmt.err) << std::endl;
+        crow::json::wvalue error_responce;
+        error_responce["error"] = "Problem with server. 1";
+        return crow::response(error_responce);
+    }
+
     libsql_statement_bind_value(
         query_stmt,
         libsql_text(
             search_query.c_str(),
             search_query.length()));
-    for (int i = 0; i < 4; i++) {
-        libsql_statement_bind_value(
-            query_stmt,
-            libsql_text(
-                like_query.c_str(),
-                like_query.length()));
-    }
     libsql_statement_bind_value(
         query_stmt,
         libsql_integer(
@@ -137,6 +139,8 @@ crow::response search_packages(const crow::request& req)
     unsigned int total_results = 0;
     bool if_read = false;
 
+    crow::json::wvalue::list items;
+
     while (true) {
         libsql_row_t row;
         if ((row = libsql_rows_next(rows)).err) {
@@ -150,12 +154,13 @@ crow::response search_packages(const crow::request& req)
         }
 
         crow::json::wvalue item;
-        
-        item["id"] = GET_ROW_TEXT(row, 0).ptr;
-        item["avatar_url"] = GET_ROW_TEXT(row, 1).ptr;
-        item["owner_name"] = GET_ROW_TEXT(row, 2).ptr;
-        // item["provider"] = (std::string)(GET_ROW_TEXT(row, 3).ptr, GET_ROW_TEXT(row, 3).len) == "gh" ? "github" : "codeberg";
 
+        item["id"] = get_row_text(row, 0);
+        item["avatar_url"] = get_row_text(row, 1);
+        item["owner_name"] = get_row_text(row, 2);
+        // item["provider"] = (std::string)(GET_ROW_TEXT(row, 3).ptr, GET_ROW_TEXT(row, 3).len) == "gh" ? "github" : "codeberg";
+        //
+        items.push_back(item);
         if (!if_read) {
             total_results = GET_ROW_UL(row, 19);
             if_read = true;
@@ -166,7 +171,7 @@ crow::response search_packages(const crow::request& req)
 
     auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
 
-    normal_responce["items"] = 
+    normal_responce["items"] = std::move(items);
 
     normal_responce["total"] = total_results;
     normal_responce["page"] = page;
