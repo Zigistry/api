@@ -14,8 +14,10 @@ inline std::string get_row_text(libsql_row_t row, int col)
     auto v = libsql_row_value(row, col);
     if (v.ok.type != LIBSQL_TYPE_TEXT)
         return "";
-    const char* p = static_cast<const char*>(v.ok.value.text.ptr);
-    return std::string(p, static_cast<std::size_t>(v.ok.value.text.len));
+    int res = v.ok.value.text.len - 1;
+    if (res <= 0)
+        return "";
+    return std::string((char*)v.ok.value.text.ptr, res);
 }
 
 libsql_connection_t database_connection;
@@ -234,7 +236,7 @@ int main()
         return 1;
     }
 
-     crow::App<crow::CORSHandler> app;
+    crow::App<crow::CORSHandler> app;
 
     auto& cors = app.get_middleware<crow::CORSHandler>();
     cors.global()
