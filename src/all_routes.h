@@ -5,5 +5,4 @@
 
 
 
-crow::response search_packages(const crow::request& req);
-crow::response search_programs(const crow::request& req);
+crow::response search(const crow::request& req, const std::string query_str);

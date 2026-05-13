@@ -2,7 +2,7 @@ COMPILER = zig c++
 BINARY_NAME = server
 BUILD_FOLDER = build
 
-SRC = src/main.cpp src/search_packages.cpp
+SRC = src/main.cpp src/search.cpp
 TARGET = $(BUILD_FOLDER)/$(BINARY_NAME)
 FLAGS = -Linclude -lsql -std=c++23
 

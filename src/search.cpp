@@ -2,8 +2,7 @@
 
 extern libsql_connection_t database_connection;
 
-
-crow::response search_packages(const crow::request& req)
+crow::response search(const crow::request& req, const std::string query_str)
 {
     auto start = std::chrono::steady_clock::now();
     const char* raw_search_query = req.url_params.get("q");
@@ -41,45 +40,7 @@ crow::response search_packages(const crow::request& req)
     search_query += "*";
     const unsigned long offset = (page - 1) * per_page;
 
-    const std::string search_packages_database_query = R"""(
-
-
-            WITH filtered AS MATERIALIZED (
-                SELECT r.id
-                FROM repos r
-                WHERE r.is_disabled = 0
-                  AND EXISTS (SELECT 1 FROM packages p WHERE p.repo_id = r.id)
-                  AND (
-                      r.id IN (SELECT repo_id FROM repo_search WHERE keywords MATCH ?)
-                  )
-            ),
-            paged AS MATERIALIZED (
-                SELECT id FROM filtered LIMIT ? OFFSET ?
-            )
-            SELECT
-                r.id, u.avatar_id, r.owner, r.platform, r.description,
-                r.issues_count, r.default_branch_name, r.fork_count,
-                r.stargazer_count, r.watchers_count, r.pushed_at, r.created_at,
-                r.is_archived, r.is_disabled, r.is_fork, r.license,
-                r.primary_language,
-                rel.minimum_zig_version,
-                COALESCE(dep.dependents_count, 0) AS dependents_count,
-                (SELECT COUNT(*) FROM filtered) AS total_results
-            FROM paged
-            JOIN repos r ON r.id = paged.id
-            LEFT JOIN users u ON u.id = r.owner
-            LEFT JOIN releases rel ON rel.repo_id = r.id AND rel.version = '__ZIGISTRY__DEFAULT__BRANCH__'
-            LEFT JOIN (
-                SELECT repo_id, COUNT(*) AS dependents_count
-                FROM repo_dependents
-                WHERE repo_id IN (SELECT id FROM paged)
-                GROUP BY repo_id
-            ) dep ON dep.repo_id = r.id;
-
-
-    )""";
-
-    const libsql_statement_t query_stmt = libsql_connection_prepare(database_connection, search_packages_database_query.c_str());
+    const libsql_statement_t query_stmt = libsql_connection_prepare(database_connection, query_str.c_str());
 
     if (query_stmt.err) {
         std::cout << libsql_error_message(query_stmt.err) << std::endl;
@@ -180,5 +141,3 @@ crow::response search_packages(const crow::request& req)
 
     return crow::response(normal_responce);
 }
-
-

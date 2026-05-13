@@ -2,9 +2,10 @@
 // doing #include <crow.h> works,
 // but added this to maintain cross-platformity
 #include "../include/crow_all.h"
+#include "./all_routes.h"
+#include "./helper_lib/helper_lib.h"
 #include <iostream>
 #include <string>
-#include "./all_routes.h"
 
 libsql_connection_t database_connection;
 
@@ -52,6 +53,14 @@ int main()
         .methods("GET"_method, "POST"_method, "OPTIONS"_method)
         .headers("Content-Type", "Authorization");
 
-    CROW_ROUTE(app, "/search/packages/")(search_packages);
+    CROW_ROUTE(app, "/search/packages/")
+    ([](const crow::request& req) {
+        return search(req, search_packages_database_query);
+    });
+    CROW_ROUTE(app, "/search/programs/")
+    ([](const crow::request& req) {
+        return search(req, search_programs_database_query);
+    });
+
     app.port(7860).multithreaded().run();
 }
