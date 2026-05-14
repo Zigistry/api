@@ -55,7 +55,52 @@ const std::string search_packages_database_query = R"""(
     )""";
 
 
+const std::string infinite_scroll_packages = R"""(
 
+
+        WITH repo_data AS (
+        SELECT
+            r.id,
+            u.avatar_id,
+            r.owner,
+            r.platform,
+            r.description,
+            r.issues_count,
+            r.default_branch_name,
+            r.fork_count,
+            r.stargazer_count,
+            r.watchers_count,
+            r.pushed_at,
+            r.created_at,
+            r.is_archived,
+            r.is_disabled,
+            r.is_fork,
+            r.license,
+            r.primary_language,
+            (
+                SELECT minimum_zig_version
+                FROM releases
+                WHERE repo_id = r.id
+                ORDER BY published_at DESC
+                LIMIT 1
+            ) AS minimum_zig_version
+        left join users u on r.owner = u.id
+        left join packages pkg on r.id = pkg.repo_id
+            left join programs prog on r.id = prog.repo_id
+            where
+                r.is_disabled = 0
+
+        and pkg.repo_id is not null
+
+        order by r.stargazer_count desc, r.id asc
+            limit ?1 offset ?2
+        )
+        select
+            rd.*,
+            (select count(*) from repo_dependents where repo_id = rd.id) as dependents_count
+        from repo_data rd
+            
+)""";
 
 
 const std::string search_programs_database_query = R"""(
@@ -95,6 +140,4 @@ const std::string search_programs_database_query = R"""(
 
 
     )""";
-
-
 

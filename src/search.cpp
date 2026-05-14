@@ -54,6 +54,7 @@ crow::response search(const crow::request& req, const std::string query_str)
         libsql_text(
             search_query.c_str(),
             search_query.length()));
+
     libsql_statement_bind_value(
         query_stmt,
         libsql_integer(
