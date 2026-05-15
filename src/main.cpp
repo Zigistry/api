@@ -63,11 +63,11 @@ int main()
     });
     CROW_ROUTE(app, "/scroll/packages/")
     ([](const crow::request& req) {
-        return search(req, infinite_scroll_packages_query);
+        return infinite_scroll(req, infinite_scroll_packages_query);
     });
     CROW_ROUTE(app, "/scroll/programs/")
     ([](const crow::request& req) {
-        return search(req, infinite_scroll_packages_query);
+        return infinite_scroll(req, infinite_scroll_programs_query);
     });
     app.port(7860).multithreaded().run();
 }

@@ -31,5 +31,35 @@ crow::response scroll(const crow::request& req, const std::string query_str)
     const unsigned long offset = (page - 1) * per_page;
     const libsql_statement_t query_stmt = libsql_connection_prepare(database_connection, query_str.c_str());
 
+    if (query_stmt.err) {
+        std::cout << libsql_error_message(query_stmt.err) << std::endl;
+        crow::json::wvalue error_responce;
+        error_responce["error"] = "Problem with server. 1";
+        return crow::response(error_responce);
+    }
 
+    libsql_statement_bind_value(
+        query_stmt,
+        libsql_integer(
+            per_page));
+
+    libsql_statement_bind_value(
+        query_stmt,
+        libsql_integer(
+            offset));
+
+    if (query_stmt.err) {
+        std::cout << libsql_error_message(query_stmt.err) << std::endl;
+        crow::json::wvalue error_responce;
+        error_responce["error"] = "Problem with server. 1";
+        return crow::response(error_responce);
+    }
+
+    const libsql_rows_t rows = libsql_statement_query(query_stmt);
+
+    if (rows.err) {
+        crow::json::wvalue error_responce;
+        error_responce["error"] = "Problem with server. 5";
+        return crow::response(error_responce);
+    }
 }
