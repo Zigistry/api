@@ -2,7 +2,7 @@
 
 extern libsql_connection_t database_connection;
 
-crow::response scroll(const crow::request& req, const std::string query_str)
+crow::response infinite_scroll(const crow::request& req, const std::string query_str)
 {
     auto start = std::chrono::steady_clock::now();
     const char* raw_per_page = req.url_params.get("per_page");
@@ -62,4 +62,52 @@ crow::response scroll(const crow::request& req, const std::string query_str)
         error_responce["error"] = "Problem with server. 5";
         return crow::response(error_responce);
     }
+
+    crow::json::wvalue normal_responce;
+
+
+    crow::json::wvalue::list items;
+
+    while (true) {
+        libsql_row_t row;
+        if ((row = libsql_rows_next(rows)).err) {
+            crow::json::wvalue error_responce;
+            error_responce["error"] = "Problem with server.";
+            return crow::response(error_responce);
+        }
+
+        if (libsql_row_empty(row)) {
+            break;
+        }
+
+        crow::json::wvalue item;
+        item["id"] = get_row_text(row, 0);
+        item["avatar_url"] = get_row_text(row, 1);
+        item["owner_name"] = get_row_text(row, 2);
+        item["description"] = get_row_text(row, 4);
+        item["platform"] = get_row_text(row, 3);
+        item["issues_count"] = GET_ROW_UL(row, 5);
+        item["default_branch_name"] = get_row_text(row, 6);
+        item["fork_count"] = GET_ROW_UL(row, 7);
+        item["stargazer_count"] = GET_ROW_UL(row, 8);
+        item["watchers_count"] = GET_ROW_UL(row, 9);
+        item["pushed_at"] = get_row_text(row, 10);
+        item["created_at"] = get_row_text(row, 11);
+        item["is_archived"] = GET_ROW_UL(row, 12);
+        item["is_disabled"] = GET_ROW_UL(row, 13);
+        item["is_fork"] = GET_ROW_UL(row, 14);
+        item["license"] = get_row_text(row, 15);
+        item["primary_language"] = get_row_text(row, 16);
+        item["minimum_zig_version"] = get_row_text(row, 17);
+        item["dependents_count"] = GET_ROW_UL(row, 18);
+
+        items.push_back(item);
+    }
+
+    auto end = std::chrono::steady_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+    normal_responce = std::move(items);
+
+    return crow::response(normal_responce);
 }

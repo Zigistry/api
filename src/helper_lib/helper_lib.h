@@ -93,94 +93,102 @@ const std::string search_programs_database_query = R"""(
     )""";
 
 const std::string infinite_scroll_packages_query = R"""(
-
+    
 
         WITH repo_data AS (
-        SELECT
-            r.id,
-            u.avatar_id,
-            r.owner,
-            r.platform,
-            r.description,
-            r.issues_count,
-            r.default_branch_name,
-            r.fork_count,
-            r.stargazer_count,
-            r.watchers_count,
-            r.pushed_at,
-            r.created_at,
-            r.is_archived,
-            r.is_disabled,
-            r.is_fork,
-            r.license,
-            r.primary_language,
-            (
-                SELECT minimum_zig_version
-                FROM releases
-                WHERE repo_id = r.id
-                ORDER BY published_at DESC
-                LIMIT 1
-            ) AS minimum_zig_version
-        left join users u on r.owner = u.id
-        left join packages pkg on r.id = pkg.repo_id
-            left join programs prog on r.id = prog.repo_id
-            where
+            SELECT
+                r.id,
+                u.avatar_id,
+                r.owner,
+                r.platform,
+                r.description,
+                r.issues_count,
+                r.default_branch_name,
+                r.fork_count,
+                r.stargazer_count,
+                r.watchers_count,
+                r.pushed_at,
+                r.created_at,
+                r.is_archived,
+                r.is_disabled,
+                r.is_fork,
+                r.license,
+                r.primary_language,
+                (
+                    SELECT minimum_zig_version
+                    FROM releases
+                    WHERE repo_id = r.id
+                    ORDER BY published_at DESC
+                    LIMIT 1
+                ) AS minimum_zig_version
+            FROM repos r
+            LEFT JOIN users u ON r.owner = u.id
+            INNER JOIN packages pkg ON r.id = pkg.repo_id
+            LEFT JOIN programs prog ON r.id = prog.repo_id
+            WHERE
                 r.is_disabled = 0
-
-        and pkg.repo_id is not null
-
-        order by r.stargazer_count desc, r.id asc
-            limit ? offset ?
+            ORDER BY r.stargazer_count DESC, r.id ASC
+            LIMIT ? OFFSET ?
         )
-        select
+        SELECT
             rd.*,
-            (select count(*) from repo_dependents where repo_id = rd.id) as dependents_count
-        from repo_data rd
+            (
+                SELECT COUNT(*)
+                FROM repo_dependents
+                WHERE repo_id = rd.id
+            ) AS dependents_count
+        FROM repo_data rd;
+
             
 )""";
 
 const std::string infinite_scroll_programs_query = R"""(
 
-    
-        WITH repo_data AS (
-        SELECT
-            r.id,
-            u.avatar_id,
-            r.owner,
-            r.platform,
-            r.description,
-            r.issues_count,
-            r.default_branch_name,
-            r.fork_count,
-            r.stargazer_count,
-            r.watchers_count,
-            r.pushed_at,
-            r.created_at,
-            r.is_archived,
-            r.is_disabled,
-            r.is_fork,
-            r.license,
-            r.primary_language,
-            (
-                SELECT minimum_zig_version
-                FROM releases
-                WHERE repo_id = r.id
-                ORDER BY published_at DESC
-                LIMIT 1
-            ) AS minimum_zig_version
-        left join users u on r.owner = u.id
-        left join packages pkg on r.id = pkg.repo_id
-            left join programs prog on r.id = prog.repo_id
-            where
-                r.is_disabled = 0
 
-        AND prog.repo_id IS NOT NULL
-        order by r.stargazer_count desc, r.id asc
-            limit ? offset ?
-        )
-        select
-            rd.*,
-            (select count(*) from repo_dependents where repo_id = rd.id) as dependents_count
-        from repo_data rd
-        
+            WITH repo_data AS (
+                SELECT
+                    r.id,
+                    u.avatar_id,
+                    r.owner,
+                    r.platform,
+                    r.description,
+                    r.issues_count,
+                    r.default_branch_name,
+                    r.fork_count,
+                    r.stargazer_count,
+                    r.watchers_count,
+                    r.pushed_at,
+                    r.created_at,
+                    r.is_archived,
+                    r.is_disabled,
+                    r.is_fork,
+                    r.license,
+                    r.primary_language,
+                    (
+                        SELECT minimum_zig_version
+                        FROM releases
+                        WHERE repo_id = r.id
+                        ORDER BY published_at DESC
+                        LIMIT 1
+                    ) AS minimum_zig_version
+                FROM repos r
+                LEFT JOIN users u ON r.owner = u.id
+                LEFT JOIN packages pkg ON r.id = pkg.repo_id
+                LEFT JOIN programs prog ON r.id = prog.repo_id
+                WHERE
+                    r.is_disabled = 0
+                    AND prog.repo_id IS NOT NULL
+                ORDER BY r.stargazer_count DESC, r.id ASC
+                LIMIT ? OFFSET ?
+            )
+            SELECT
+                rd.*,
+                (
+                    SELECT COUNT(*)
+                    FROM repo_dependents
+                    WHERE repo_id = rd.id
+                ) AS dependents_count
+            FROM repo_data rd;        
+
+            
     )""";
