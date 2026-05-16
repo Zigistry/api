@@ -6,8 +6,6 @@ const SOURCE_FILES = [_][]const u8{
     "./src/scroll.cpp",
 };
 
-// FLAGS = -Linclude -lsql -std=c++23
-
 const FLAGS = [_][]const u8{
     "-std=c++23",
 };
@@ -17,7 +15,6 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const root_module = b.createModule(.{
-        // .root_source_file = b.path("src/main.cpp"),
         .target = target,
         .optimize = optimize,
         .link_libcpp = true,
@@ -26,14 +23,12 @@ pub fn build(b: *std.Build) void {
     root_module.addCSourceFiles(.{
         .files = &SOURCE_FILES,
         .flags = &FLAGS,
+        .language = .cpp,
     });
 
     root_module.addIncludePath(b.path("./include"));
-    root_module.addIncludePath(.{
-        .cwd_relative = "/opt/homebrew/opt/asio/include",
-    });
-
-    root_module.addObjectFile(b.path("./include/libsql.dylib"));
+    root_module.addLibraryPath(b.path("./include"));
+    root_module.linkSystemLibrary("sql", .{});
 
     const exe = b.addExecutable(.{
         .name = "app",
