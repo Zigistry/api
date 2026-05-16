@@ -1,5 +1,7 @@
 # build folder
 build/
+.zig-cache/
+.zig-out/
 # miselaneous
 .DS_Store
 
