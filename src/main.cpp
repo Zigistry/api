@@ -61,11 +61,11 @@ int main()
     ([](const crow::request& req) {
         return search(req, search_programs_database_query);
     });
-    CROW_ROUTE(app, "/scroll/packages/")
+    CROW_ROUTE(app, "/packages/scroll/")
     ([](const crow::request& req) {
         return infinite_scroll(req, infinite_scroll_packages_query);
     });
-    CROW_ROUTE(app, "/scroll/programs/")
+    CROW_ROUTE(app, "/programs/scroll/")
     ([](const crow::request& req) {
         return infinite_scroll(req, infinite_scroll_programs_query);
     });
