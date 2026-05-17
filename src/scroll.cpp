@@ -2,6 +2,19 @@
 
 extern libsql_connection_t database_connection;
 
+// https://www.geeksforgeeks.org/java/how-to-split-a-string-in-cc-python-and-java/
+
+std::string adv_tokenizer(std::string s, char del, int index)
+{
+    std::stringstream ss(s);
+    std::string word;
+    int count = -1;
+    while (!ss.eof() and count++ != index) {
+        getline(ss, word, del);
+    }
+    return word;
+}
+
 crow::response infinite_scroll(const crow::request& req, const std::string query_str)
 {
     auto start = std::chrono::steady_clock::now();
@@ -65,7 +78,6 @@ crow::response infinite_scroll(const crow::request& req, const std::string query
 
     crow::json::wvalue normal_responce;
 
-
     crow::json::wvalue::list items;
 
     while (true) {
@@ -81,11 +93,20 @@ crow::response infinite_scroll(const crow::request& req, const std::string query
         }
 
         crow::json::wvalue item;
-        item["id"] = get_row_text(row, 0);
+        std::string id = get_row_text(row, 0);
+
+        item["id"] = id;
+
         item["avatar_url"] = get_row_text(row, 1);
         item["owner_name"] = get_row_text(row, 2);
+
+        item["repo_name"] = adv_tokenizer(id, '/', 2);
+        item["owner"] = get_row_text(row, 2);
+
+        std::string provider = get_row_text(row, 3);
         item["description"] = get_row_text(row, 4);
         item["platform"] = get_row_text(row, 3);
+        item["provider"] = provider == "github" ? "gh" : "cb";
         item["issues_count"] = GET_ROW_UL(row, 5);
         item["default_branch_name"] = get_row_text(row, 6);
         item["fork_count"] = GET_ROW_UL(row, 7);
@@ -93,12 +114,12 @@ crow::response infinite_scroll(const crow::request& req, const std::string query
         item["watchers_count"] = GET_ROW_UL(row, 9);
         item["pushed_at"] = get_row_text(row, 10);
         item["created_at"] = get_row_text(row, 11);
-        item["is_archived"] = GET_ROW_UL(row, 12);
-        item["is_disabled"] = GET_ROW_UL(row, 13);
-        item["is_fork"] = GET_ROW_UL(row, 14);
+        item["is_archived"] = (bool)GET_ROW_UL(row, 12);
+        item["is_disabled"] = (bool)GET_ROW_UL(row, 13);
+        item["is_fork"] = (bool)GET_ROW_UL(row, 14);
         item["license"] = get_row_text(row, 15);
         item["primary_language"] = get_row_text(row, 16);
-        item["minimum_zig_version"] = get_row_text(row, 17);
+        item["minimum_zig_version"] = get_row_text(row, 17) == "" ? "0.0.0" : get_row_text(row, 17);
         item["dependents_count"] = GET_ROW_UL(row, 18);
 
         items.push_back(item);
