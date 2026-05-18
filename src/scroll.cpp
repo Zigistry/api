@@ -4,17 +4,6 @@ extern libsql_connection_t database_connection;
 
 // https://www.geeksforgeeks.org/java/how-to-split-a-string-in-cc-python-and-java/
 
-std::string adv_tokenizer(std::string s, char del, int index)
-{
-    std::stringstream ss(s);
-    std::string word;
-    int count = -1;
-    while (!ss.eof() and count++ != index) {
-        getline(ss, word, del);
-    }
-    return word;
-}
-
 crow::response infinite_scroll(const crow::request& req, const std::string query_str)
 {
     auto start = std::chrono::steady_clock::now();

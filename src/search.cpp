@@ -100,10 +100,19 @@ crow::response search(const crow::request& req, const std::string query_str)
         }
 
         crow::json::wvalue item;
+        std::string id = get_row_text(row, 0);
+        item["id"] = id;
+
+        std::string provider = get_row_text(row, 3);
 
         item["id"] = get_row_text(row, 0);
         item["avatar_url"] = get_row_text(row, 1);
         item["owner_name"] = get_row_text(row, 2);
+        item["owner"] = get_row_text(row, 2);
+
+        item["repo_name"] = adv_tokenizer(id, '/', 2);
+        item["provider"] = provider == "github" ? "gh" : "cb";
+
         item["description"] = get_row_text(row, 4);
         item["platform"] = get_row_text(row, 3);
         item["issues_count"] = GET_ROW_UL(row, 5);
@@ -118,7 +127,8 @@ crow::response search(const crow::request& req, const std::string query_str)
         item["is_fork"] = GET_ROW_UL(row, 14);
         item["license"] = get_row_text(row, 15);
         item["primary_language"] = get_row_text(row, 16);
-        item["minimum_zig_version"] = get_row_text(row, 17);
+        item["minimum_zig_version"] = get_row_text(row, 17) == "" ? "0.0.0" : get_row_text(row, 17);
+
         item["dependents_count"] = GET_ROW_UL(row, 18);
 
         items.push_back(item);
