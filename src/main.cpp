@@ -69,5 +69,7 @@ int main()
     ([](const crow::request& req) {
         return infinite_scroll(req, infinite_scroll_programs_query);
     });
+    CROW_ROUTE(app, "/users/")
+    (get_user_route);
     app.port(7860).multithreaded().run();
 }

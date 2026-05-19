@@ -4,7 +4,7 @@
 
 extern libsql_connection_t database_connection;
 
-crow::response get_user_route(const crow::request& req, const std::string query_str)
+crow::response get_user_route(const crow::request& req)
 {
     const char* user_id = req.url_params.get("q");
     std::string user_id_string;
@@ -105,7 +105,29 @@ crow::response get_user_route(const crow::request& req, const std::string query_
 
     )""";
 
-    const libsql_rows_t rows_2 = libsql_statement_query(fetch_user_stmt);
+    libsql_statement_t fetch_user_repos_query_stmt = libsql_connection_prepare(
+        database_connection,
+        fetch_user_repos_query.c_str());
+
+    if (fetch_user_repos_query_stmt.err) {
+        std::cout << libsql_error_message(fetch_user_repos_query_stmt.err) << std::endl;
+        crow::json::wvalue error_response;
+        error_response["error"] = "Problem with server. 2";
+        return crow::response(error_response);
+    }
+
+    libsql_statement_bind_value(
+        fetch_user_repos_query_stmt,
+        libsql_text(user_id_string.c_str(), user_id_string.length()));
+
+    if (fetch_user_repos_query_stmt.err) {
+        std::cout << libsql_error_message(fetch_user_repos_query_stmt.err) << std::endl;
+        crow::json::wvalue error_response;
+        error_response["error"] = "Problem with server. 3";
+        return crow::response(error_response);
+    }
+
+    const libsql_rows_t rows_2 = libsql_statement_query(fetch_user_repos_query_stmt);
 
     crow::json::wvalue::list packages;
     crow::json::wvalue::list programs;
@@ -153,8 +175,8 @@ crow::response get_user_route(const crow::request& req, const std::string query_
         item["minimum_zig_version"] = get_row_text(row3, 17) == "" ? "0.0.0" : get_row_text(row3, 17);
 
         item["dependents_count"] = GET_ROW_UL(row3, 18);
-        const bool is_package = GET_ROW_UL(row3, 19);
-        const bool is_program = GET_ROW_UL(row3, 20);
+        const bool is_package = GET_ROW_BOOL(row3, 19);
+        const bool is_program = GET_ROW_BOOL(row3, 20);
 
         if (is_package) {
             packages.push_back(item);
@@ -162,7 +184,7 @@ crow::response get_user_route(const crow::request& req, const std::string query_
             programs.push_back(item);
         }
     }
-    user_data["packages"] = packages;
-    user_data["programs"] = programs;
+    user_data["packages"] = std::move(packages);
+    user_data["programs"] = std::move(programs);
     return crow::response(user_data);
 }

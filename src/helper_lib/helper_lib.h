@@ -4,6 +4,7 @@
 #include "../../include/libsql.h"
 
 #define GET_ROW_UL(A, B) ((unsigned int)libsql_row_value((A), (B)).ok.value.integer)
+#define GET_ROW_BOOL(A, B) ((bool)libsql_row_value((A), (B)).ok.value.integer)
 
 std::string get_row_text(libsql_row_t row, int col);
 std::string adv_tokenizer(std::string s, char del, int index);
