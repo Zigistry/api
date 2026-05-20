@@ -5,6 +5,7 @@ const SOURCE_FILES = [_][]const u8{
     "./src/search.cpp",
     "./src/scroll.cpp",
     "./src/users.cpp",
+    "./src/packages_index_details.cpp",
     "./src/helper_lib/helper_lib.cpp",
 };
 

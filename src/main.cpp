@@ -71,5 +71,7 @@ int main()
     });
     CROW_ROUTE(app, "/users/")
     (get_user_route);
+    CROW_ROUTE(app, "/packageIndexDetails/")
+    (packageIndexDetails);
     app.port(7860).multithreaded().run();
 }
