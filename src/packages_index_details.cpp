@@ -4,7 +4,6 @@
 #include <expected>
 extern libsql_connection_t database_connection;
 
-
 std::expected<crow::json::wvalue, std::string> special_parsing(std::string query)
 {
     const libsql_statement_t query_stmt = libsql_connection_prepare(database_connection, query.c_str());
@@ -67,12 +66,10 @@ std::expected<crow::json::wvalue, std::string> special_parsing(std::string query
         items.push_back(item);
     }
 
-    normal_responce["latest"] = std::move(items);
-
-    return normal_responce;
+    crow::json::wvalue res;
+    res = std::move(items);
+    return res;
 }
-
-
 
 crow::response packageIndexDetails(const crow::request& req)
 {
@@ -217,8 +214,7 @@ crow::response packageIndexDetails(const crow::request& req)
         
         )""";
 
-
-            std::string get_repo_games_section = R"""(
+    std::string get_repo_games_section = R"""(
 
 
         WITH section_repos AS (
@@ -268,7 +264,7 @@ crow::response packageIndexDetails(const crow::request& req)
         
         )""";
 
-    std::string get_repo_games_section = R"""(
+    std::string get_repo_web_section = R"""(
 
 
         WITH section_repos AS (
@@ -318,15 +314,25 @@ crow::response packageIndexDetails(const crow::request& req)
         
         )""";
 
-
     auto latest_repositories = special_parsing(get_latest_repos_query);
     auto most_used_repos = special_parsing(get_most_used_repos_query);
-    auto games_repos = special_parsing(get_repo_games_sections);
-    auto gui_repos = special_parsing(get_repo_gui_sections);
-    auto web_repos = special_parsing(get_repo_web_sections);
+    auto games_repos = special_parsing(get_repo_games_section);
+    auto gui_repos = special_parsing(get_repo_gui_section);
+    auto web_repos = special_parsing(get_repo_web_section);
 
-    if(latest_repositories)
+    if (latest_repositories and most_used_repos and games_repos and gui_repos and web_repos) {
+        crow::json::wvalue normal_responce;
 
-    
+        normal_responce["latest"] = std::move(*latest_repositories);
+        normal_responce["most_used"] = std::move(*most_used_repos);
+        normal_responce["games"] = std::move(*games_repos);
+        normal_responce["gui"] = std::move(*gui_repos);
+        normal_responce["web"] = std::move(*web_repos);
+
+        return crow::response(normal_responce);
+    } else {
+        crow::json::wvalue error_responce;
+        error_responce["error"] = "some problem on server.";
+        return crow::response(error_responce);
+    }
 }
-
