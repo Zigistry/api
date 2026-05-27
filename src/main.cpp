@@ -11,23 +11,10 @@ libsql_connection_t database_connection;
 
 int main()
 {
-    const char* database_url = getenv("DATABASE_URL");
-    const char* api_key = getenv("API_KEY");
-
-    if (database_url == NULL or api_key == NULL) {
-        std::cout << "Oh no! Problem! No env keys" << std::endl;
-        return 1;
-    }
-
     libsql_setup(libsql_config_t {});
 
     const libsql_database_t db = libsql_database_init((libsql_database_desc_t) {
-        .url = database_url,
-        .path = "local.db",
-        .auth_token = api_key,
-        // every hour
-        .sync_interval = 1000 * 60 * 60,
-        .synced = true,
+        .path = "zigistry.db",
     });
 
     if (db.err) {
@@ -71,7 +58,11 @@ int main()
     });
     CROW_ROUTE(app, "/users/")
     (get_user_route);
+
+    CROW_ROUTE(app, "/programIndexDetails/")
+    (programIndexDetails);
+
     CROW_ROUTE(app, "/packageIndexDetails/")
     (packageIndexDetails);
-    app.port(7860).multithreaded().run();
+    app.port(8000).multithreaded().run();
 }

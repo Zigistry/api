@@ -2,12 +2,14 @@
 
 #include "../../include/crow_all.h"
 #include "../../include/libsql.h"
+#include <expected>
 
 #define GET_ROW_UL(A, B) ((unsigned int)libsql_row_value((A), (B)).ok.value.integer)
 #define GET_ROW_BOOL(A, B) ((bool)libsql_row_value((A), (B)).ok.value.integer)
 
 std::string get_row_text(libsql_row_t row, int col);
 std::string adv_tokenizer(std::string s, char del, int index);
+std::expected<crow::json::wvalue, std::string> special_parsing(std::string query);
 
 
 const std::string search_packages_database_query = R"""(
