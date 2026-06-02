@@ -10,4 +10,4 @@ crow::response infinite_scroll(const crow::request& req, const std::string query
 crow::response get_user_route(const crow::request& req);
 crow::response packageIndexDetails(const crow::request& req);
 crow::response programIndexDetails(const crow::request& req);
-
+crow::response package_details(const crow::request& req);

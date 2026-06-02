@@ -64,5 +64,15 @@ int main()
 
     CROW_ROUTE(app, "/packageIndexDetails/")
     (packageIndexDetails);
+
+    CROW_ROUTE(app, "/packages/")
+    ([](const crow::request& req) {
+        return package_details(req);
+    });
+
+    CROW_ROUTE(app, "/programs/")
+    ([](const crow::request& req) {
+        return package_details(req);
+    });
     app.port(8000).multithreaded().run();
 }

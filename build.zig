@@ -8,6 +8,7 @@ const SOURCE_FILES = [_][]const u8{
     "./src/packages_index_details.cpp",
     "./src/programs_index_details.cpp",
     "./src/helper_lib/helper_lib.cpp",
+    "./src/package_detial.cpp",
 };
 
 const FLAGS = [_][]const u8{
