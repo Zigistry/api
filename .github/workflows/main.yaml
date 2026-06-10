@@ -18,13 +18,20 @@ jobs:
 
       - name: download libsql
         run: curl -L -o /tmp/libsql-c.zip https://github.com/tursodatabase/libsql-c/releases/download/v0.3.4/x86_64-unknown-linux-gnu-release.zip
+
       - name: unzip file
         run: unzip -o /tmp/libsql-c.zip -d /tmp/libsql-c
 
       - name: copy
         run: cp /tmp/libsql-c/liblibsql.a ./include/libsql.a
+
       - name: make
         run: make
 
 
+      - name: Upload server binary to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload api-binary ./build/server --clobber
 
