@@ -1,8 +1,11 @@
 #include <iostream>
+#include <mutex>
 
 #include "../../include/crow_all.h"
 #include "../../include/libsql.h"
 #include <expected>
+
+extern std::mutex db_mutex;
 
 #define GET_ROW_UL(A, B) ((unsigned int)libsql_row_value((A), (B)).ok.value.integer)
 #define GET_ROW_BOOL(A, B) ((bool)libsql_row_value((A), (B)).ok.value.integer)

@@ -32,6 +32,7 @@ pub fn build(b: *std.Build) void {
     });
 
     root_module.addIncludePath(b.path("./include"));
+    root_module.addIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
     root_module.addLibraryPath(b.path("./include"));
     root_module.linkSystemLibrary("sql", .{});
 

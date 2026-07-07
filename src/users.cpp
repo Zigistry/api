@@ -6,6 +6,7 @@ extern libsql_connection_t database_connection;
 
 crow::response get_user_route(const crow::request& req)
 {
+    std::lock_guard<std::mutex> lock(db_mutex);
     const char* user_id = req.url_params.get("q");
     std::string user_id_string;
 

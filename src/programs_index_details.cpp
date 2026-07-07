@@ -1,8 +1,5 @@
 #include "../include/crow_all.h"
-#include <sqlite3.h>
 #include "./helper_lib/helper_lib.h"
-
-extern sqlite3* database_connection;
 
 crow::response programIndexDetails(const crow::request& req)
 {

@@ -30,6 +30,7 @@ std::string adv_tokenizer(std::string s, char del, int index)
 
 std::expected<crow::json::wvalue, std::string> special_parsing(std::string query)
 {
+    std::lock_guard<std::mutex> lock(db_mutex);
     const libsql_statement_t query_stmt = libsql_connection_prepare(database_connection, query.c_str());
 
     if (query_stmt.err) {

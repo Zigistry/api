@@ -6,6 +6,7 @@ extern libsql_connection_t database_connection;
 
 crow::response infinite_scroll(const crow::request& req, const std::string query_str)
 {
+    std::lock_guard<std::mutex> lock(db_mutex);
     auto start = std::chrono::steady_clock::now();
     const char* raw_per_page = req.url_params.get("per_page");
     const char* raw_page = req.url_params.get("page");

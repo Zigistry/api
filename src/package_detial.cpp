@@ -4,6 +4,7 @@ extern libsql_connection_t database_connection;
 
 crow::response package_details(const crow::request& req)
 {
+    std::lock_guard<std::mutex> lock(db_mutex);
     const char* repo_id = req.url_params.get("q");
 
     if (!repo_id) {

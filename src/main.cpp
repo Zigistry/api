@@ -6,8 +6,10 @@
 #include "./helper_lib/helper_lib.h"
 #include <iostream>
 #include <string>
+#include <mutex>
 
 libsql_connection_t database_connection;
+std::mutex db_mutex;
 
 int main()
 {
