@@ -155,7 +155,8 @@ crow::response package_details(const crow::request& req)
                 published_at,
                 minimum_zig_version,
                 readme_url,
-                is_prerelease
+                is_prerelease,
+                directory_files
             FROM releases
             WHERE repo_id = ?
             AND version = ?
@@ -169,7 +170,8 @@ crow::response package_details(const crow::request& req)
                 published_at,
                 minimum_zig_version,
                 readme_url,
-                is_prerelease
+                is_prerelease,
+                directory_files
             FROM releases
             WHERE repo_id = ?
             ORDER BY published_at DESC
@@ -210,6 +212,7 @@ crow::response package_details(const crow::request& req)
 
         response["readme_url"] = get_row_text(release_row, 4);
         response["is_prerelease"] = GET_ROW_UL(release_row, 5) != 0;
+        response["directory_files"] = get_row_text(release_row, 6);
 
         crow::json::wvalue::list deps;
 
