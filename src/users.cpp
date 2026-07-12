@@ -1,8 +1,8 @@
 #include "../include/crow_all.h"
-#include "../include/libsql.h"
+#include <sqlite3.h>
 #include "./helper_lib/helper_lib.h"
 
-extern libsql_connection_t database_connection;
+extern sqlite3* database_connection;
 
 crow::response get_user_route(const crow::request& req)
 {
@@ -18,39 +18,46 @@ crow::response get_user_route(const crow::request& req)
 
     user_id_string = user_id;
 
-    const libsql_statement_t fetch_user_stmt = libsql_connection_prepare(
+    sqlite3_stmt* fetch_user_stmt = nullptr;
+    int rc = sqlite3_prepare_v2(
         database_connection,
-        "SELECT id, avatar_id, platform, bio FROM users WHERE id = ?");
+        "SELECT id, avatar_id, platform, bio FROM users WHERE id = ?",
+        -1,
+        &fetch_user_stmt,
+        nullptr);
 
-    if (fetch_user_stmt.err) {
-        std::cout << libsql_error_message(fetch_user_stmt.err) << std::endl;
+    if (rc != SQLITE_OK) {
+        std::cout << sqlite3_errstr(rc) << std::endl;
+        sqlite3_finalize(fetch_user_stmt);
         crow::json::wvalue error_responce;
         error_responce["error"] = "Problem with server. 1";
         return crow::response(error_responce);
     }
 
-    libsql_statement_bind_value(
+    int bind_rc = sqlite3_bind_text(
         fetch_user_stmt,
-        libsql_text(
-            user_id_string.c_str(),
-            user_id_string.length()));
+        1,
+        user_id_string.c_str(),
+        user_id_string.length(),
+        SQLITE_TRANSIENT);
 
-    if (fetch_user_stmt.err) {
-        std::cout << libsql_error_message(fetch_user_stmt.err) << std::endl;
+    if (bind_rc != SQLITE_OK) {
+        std::cout << sqlite3_errstr(bind_rc) << std::endl;
+        sqlite3_finalize(fetch_user_stmt);
         crow::json::wvalue error_responce;
         error_responce["error"] = "Problem with server. 1";
         return crow::response(error_responce);
     }
-    const libsql_rows_t rows = libsql_statement_query(fetch_user_stmt);
 
-    libsql_row_t row;
-    if ((row = libsql_rows_next(rows)).err) {
+    int step_rc = sqlite3_step(fetch_user_stmt);
+    if (step_rc == SQLITE_DONE) {
+        sqlite3_finalize(fetch_user_stmt);
         crow::json::wvalue error_responce;
         error_responce["error"] = "Unknown id.";
         return crow::response(error_responce);
     }
-
-    if (libsql_row_empty(row)) {
+    if (step_rc != SQLITE_ROW) {
+        sqlite3_finalize(fetch_user_stmt);
         crow::json::wvalue error_responce;
         error_responce["error"] = "Unknown id.";
         return crow::response(error_responce);
@@ -58,10 +65,10 @@ crow::response get_user_route(const crow::request& req)
 
     crow::json::wvalue user_data;
 
-    user_data["id"] = get_row_text(row, 0);
-    user_data["avatar_id"] = get_row_text(row, 1);
-    user_data["platform"] = get_row_text(row, 2);
-    user_data["bio"] = get_row_text(row, 3);
+    user_data["id"] = get_row_text(fetch_user_stmt, 0);
+    user_data["avatar_id"] = get_row_text(fetch_user_stmt, 1);
+    user_data["platform"] = get_row_text(fetch_user_stmt, 2);
+    user_data["bio"] = get_row_text(fetch_user_stmt, 3);
 
     const std::string fetch_user_repos_query = R"""(
 
@@ -106,78 +113,86 @@ crow::response get_user_route(const crow::request& req)
 
     )""";
 
-    libsql_statement_t fetch_user_repos_query_stmt = libsql_connection_prepare(
+    sqlite3_stmt* fetch_user_repos_query_stmt = nullptr;
+    int rc2 = sqlite3_prepare_v2(
         database_connection,
-        fetch_user_repos_query.c_str());
+        fetch_user_repos_query.c_str(),
+        -1,
+        &fetch_user_repos_query_stmt,
+        nullptr);
 
-    if (fetch_user_repos_query_stmt.err) {
-        std::cout << libsql_error_message(fetch_user_repos_query_stmt.err) << std::endl;
+    if (rc2 != SQLITE_OK) {
+        std::cout << sqlite3_errstr(rc2) << std::endl;
+        sqlite3_finalize(fetch_user_repos_query_stmt);
         crow::json::wvalue error_response;
         error_response["error"] = "Problem with server. 2";
         return crow::response(error_response);
     }
 
-    libsql_statement_bind_value(
+    int bind_rc2 = sqlite3_bind_text(
         fetch_user_repos_query_stmt,
-        libsql_text(user_id_string.c_str(), user_id_string.length()));
+        1,
+        user_id_string.c_str(),
+        user_id_string.length(),
+        SQLITE_TRANSIENT);
 
-    if (fetch_user_repos_query_stmt.err) {
-        std::cout << libsql_error_message(fetch_user_repos_query_stmt.err) << std::endl;
+    if (bind_rc2 != SQLITE_OK) {
+        std::cout << sqlite3_errstr(bind_rc2) << std::endl;
+        sqlite3_finalize(fetch_user_repos_query_stmt);
         crow::json::wvalue error_response;
         error_response["error"] = "Problem with server. 3";
         return crow::response(error_response);
     }
 
-    const libsql_rows_t rows_2 = libsql_statement_query(fetch_user_repos_query_stmt);
-
     crow::json::wvalue::list packages;
     crow::json::wvalue::list programs;
 
     while (true) {
-        libsql_row_t row3;
-        if ((row3 = libsql_rows_next(rows_2)).err) {
+        int r = sqlite3_step(fetch_user_repos_query_stmt);
+        if (r != SQLITE_ROW && r != SQLITE_DONE) {
+            sqlite3_finalize(fetch_user_repos_query_stmt);
             crow::json::wvalue error_responce;
             error_responce["error"] = "Problem with server.";
             return crow::response(error_responce);
         }
 
-        if (libsql_row_empty(row3)) {
+        if (r == SQLITE_DONE) {
             break;
         }
 
         crow::json::wvalue item;
-        std::string id = get_row_text(row3, 0);
+        std::string id = get_row_text(fetch_user_repos_query_stmt, 0);
         item["id"] = id;
 
-        std::string provider = get_row_text(row3, 3);
+        std::string provider = get_row_text(fetch_user_repos_query_stmt, 3);
 
-        item["id"] = get_row_text(row, 0);
-        item["avatar_url"] = get_row_text(row3, 1);
-        item["owner_name"] = get_row_text(row3, 2);
-        item["owner"] = get_row_text(row3, 2);
+        item["id"] = get_row_text(fetch_user_stmt, 0);
+        item["avatar_url"] = get_row_text(fetch_user_repos_query_stmt, 1);
+        item["owner_name"] = get_row_text(fetch_user_repos_query_stmt, 2);
+        item["owner"] = get_row_text(fetch_user_repos_query_stmt, 2);
 
         item["repo_name"] = adv_tokenizer(id, '/', 2);
         item["provider"] = provider == "github" ? "gh" : "cb";
 
-        item["description"] = get_row_text(row3, 4);
-        item["platform"] = get_row_text(row3, 3);
-        item["issues_count"] = GET_ROW_UL(row3, 5);
-        item["default_branch_name"] = get_row_text(row3, 6);
-        item["fork_count"] = GET_ROW_UL(row3, 7);
-        item["stargazer_count"] = GET_ROW_UL(row3, 8);
-        item["watchers_count"] = GET_ROW_UL(row3, 9);
-        item["pushed_at"] = get_row_text(row3, 10);
-        item["created_at"] = get_row_text(row3, 11);
-        item["is_archived"] = GET_ROW_UL(row3, 12);
-        item["is_disabled"] = GET_ROW_UL(row3, 13);
-        item["is_fork"] = GET_ROW_UL(row3, 14);
-        item["license"] = get_row_text(row3, 15);
-        item["primary_language"] = get_row_text(row3, 16);
-        item["minimum_zig_version"] = get_row_text(row3, 17) == "" ? "0.0.0" : get_row_text(row3, 17);
+        item["description"] = get_row_text(fetch_user_repos_query_stmt, 4);
+        item["platform"] = get_row_text(fetch_user_repos_query_stmt, 3);
+        item["issues_count"] = GET_ROW_UL(fetch_user_repos_query_stmt, 5);
+        item["default_branch_name"] = get_row_text(fetch_user_repos_query_stmt, 6);
+        item["fork_count"] = GET_ROW_UL(fetch_user_repos_query_stmt, 7);
+        item["stargazer_count"] = GET_ROW_UL(fetch_user_repos_query_stmt, 8);
+        item["watchers_count"] = GET_ROW_UL(fetch_user_repos_query_stmt, 9);
+        item["pushed_at"] = get_row_text(fetch_user_repos_query_stmt, 10);
+        item["created_at"] = get_row_text(fetch_user_repos_query_stmt, 11);
+        item["is_archived"] = GET_ROW_UL(fetch_user_repos_query_stmt, 12);
+        item["is_disabled"] = GET_ROW_UL(fetch_user_repos_query_stmt, 13);
+        item["is_fork"] = GET_ROW_UL(fetch_user_repos_query_stmt, 14);
+        item["license"] = get_row_text(fetch_user_repos_query_stmt, 15);
+        item["primary_language"] = get_row_text(fetch_user_repos_query_stmt, 16);
+        item["minimum_zig_version"] = get_row_text(fetch_user_repos_query_stmt, 17) == "" ? "0.0.0" : get_row_text(fetch_user_repos_query_stmt, 17);
 
-        item["dependents_count"] = GET_ROW_UL(row3, 18);
-        const bool is_package = GET_ROW_BOOL(row3, 19);
-        const bool is_program = GET_ROW_BOOL(row3, 20);
+        item["dependents_count"] = GET_ROW_UL(fetch_user_repos_query_stmt, 18);
+        const bool is_package = GET_ROW_BOOL(fetch_user_repos_query_stmt, 19);
+        const bool is_program = GET_ROW_BOOL(fetch_user_repos_query_stmt, 20);
 
         if (is_package) {
             packages.push_back(item);
@@ -185,6 +200,8 @@ crow::response get_user_route(const crow::request& req)
             programs.push_back(item);
         }
     }
+    sqlite3_finalize(fetch_user_repos_query_stmt);
+    sqlite3_finalize(fetch_user_stmt);
     user_data["packages"] = std::move(packages);
     user_data["programs"] = std::move(programs);
     return crow::response(user_data);

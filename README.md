@@ -7,16 +7,14 @@ git clone git@github.com:Zigistry/api.git
 cd api
 ```
 
-- **Then we need to download the release of the latest libsql library from turso**
+- **Then we need to install sqlite3 (with the FTS5 extension) for your platform**
 
 ```sh
-wget -O ./a.zip https://github.com/tursodatabase/libsql-c/releases/download/v0.3.4/aarch64-apple-darwin-debug.zip
+brew install sqlite3
+
+sudo dnf install -y sqlite-devel
 
 wget -O ./zigistry.db https://huggingface.co/buckets/Zigistry/Zigistry/resolve/zigistry.db?download=true
-
-unzip ./a.zip
-
-mv ./liblibsql.a ./include/libsql.a
 ```
 
 - ****

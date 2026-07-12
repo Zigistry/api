@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
     root_module.addIncludePath(b.path("./include"));
     root_module.addIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
     root_module.addLibraryPath(b.path("./include"));
-    root_module.linkSystemLibrary("sql", .{});
+    root_module.linkSystemLibrary("sqlite3", .{});
 
     const exe = b.addExecutable(.{
         .name = "app",

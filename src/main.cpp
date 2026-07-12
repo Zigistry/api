@@ -1,4 +1,4 @@
-#include "../include/libsql.h"
+#include <sqlite3.h>
 // doing #include <crow.h> works,
 // but added this to maintain cross-platformity
 #include "../include/crow_all.h"
@@ -8,31 +8,19 @@
 #include <string>
 #include <mutex>
 
-libsql_connection_t database_connection;
+sqlite3* database_connection;
 std::mutex db_mutex;
 
 int main()
 {
-    libsql_setup(libsql_config_t {});
+    int rc = sqlite3_open_v2("zigistry.db", &database_connection, SQLITE_OPEN_READONLY, nullptr);
 
-    const libsql_database_t db = libsql_database_init((libsql_database_desc_t) {
-        .path = "zigistry.db",
-    });
-
-    if (db.err) {
-        std::cerr << "Error:\n"
-                  << libsql_error_message(db.err) << std::endl;
+    if (rc != SQLITE_OK) {
+        std::cerr << "Connection error: " << sqlite3_errstr(rc) << std::endl;
         return 1;
     }
-
-    database_connection = libsql_database_connect(db);
 
     std::cout << "Connected..." << std::endl;
-
-    if (database_connection.err) {
-        std::cerr << "Connection error: " << libsql_error_message(database_connection.err) << std::endl;
-        return 1;
-    }
 
     crow::App<crow::CORSHandler> app;
 

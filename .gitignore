@@ -48,6 +48,7 @@ zig-out/
 
 # Debug files
 *.dSYM/
+.idea/
 *.su
 *.idb
 *.pdb

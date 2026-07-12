@@ -14,16 +14,7 @@ jobs:
       - name: Install Asio
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasio-dev
-
-      - name: download libsql
-        run: curl -L -o /tmp/libsql-c.zip https://github.com/tursodatabase/libsql-c/releases/download/v0.3.4/x86_64-unknown-linux-gnu-release.zip
-
-      - name: unzip file
-        run: unzip -o /tmp/libsql-c.zip -d /tmp/libsql-c
-
-      - name: copy
-        run: cp /tmp/libsql-c/liblibsql.a ./include/libsql.a
+          sudo apt-get install -y libasio-dev libsqlite3-dev
 
       - name: make
         run: make

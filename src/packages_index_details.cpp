@@ -1,8 +1,7 @@
 #include "../include/crow_all.h"
-#include "../include/libsql.h"
 #include "./helper_lib/helper_lib.h"
 #include <expected>
-extern libsql_connection_t database_connection;
+extern sqlite3* database_connection;
 
 crow::response packageIndexDetails(const crow::request& req)
 {

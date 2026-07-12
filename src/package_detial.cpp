@@ -1,6 +1,6 @@
 #include "./helper_lib/helper_lib.h"
 
-extern libsql_connection_t database_connection;
+extern sqlite3* database_connection;
 
 crow::response package_details(const crow::request& req)
 {
@@ -43,40 +43,39 @@ crow::response package_details(const crow::request& req)
         LIMIT 1
     )";
 
-    auto stmt = libsql_connection_prepare(database_connection, repo_query.c_str());
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(database_connection, repo_query.c_str(), -1, &stmt, nullptr);
+    sqlite3_bind_text(stmt, 1, repo_id, strlen(repo_id), SQLITE_TRANSIENT);
 
-    libsql_statement_bind_value(
-        stmt,
-        libsql_text(repo_id, strlen(repo_id)));
+    int step_rc = sqlite3_step(stmt);
+    bool row_empty = (step_rc == SQLITE_DONE);
 
-    auto rows = libsql_statement_query(stmt);
-    auto row = libsql_rows_next(rows);
-
-    if (libsql_row_empty(row)) {
+    if (row_empty) {
+        sqlite3_finalize(stmt);
         crow::json::wvalue error;
         error["error"] = "Repository not found";
         return crow::response(404, error);
     }
 
-    response["id"] = get_row_text(row, 0);
-    response["avatar_id"] = get_row_text(row, 1);
-    response["owner"] = get_row_text(row, 2);
-    response["platform"] = get_row_text(row, 3);
-    response["description"] = get_row_text(row, 4);
-    response["issues_count"] = GET_ROW_UL(row, 5);
-    response["default_branch_name"] = get_row_text(row, 6);
-    response["fork_count"] = GET_ROW_UL(row, 7);
-    response["stargazer_count"] = GET_ROW_UL(row, 8);
-    response["watchers_count"] = GET_ROW_UL(row, 9);
-    response["pushed_at"] = get_row_text(row, 10);
-    response["created_at"] = get_row_text(row, 11);
-    response["is_archived"] = GET_ROW_UL(row, 12) != 0;
-    response["is_disabled"] = GET_ROW_UL(row, 13) != 0;
-    response["is_fork"] = GET_ROW_UL(row, 14) != 0;
-    response["license"] = get_row_text(row, 15);
-    response["primary_language"] = get_row_text(row, 16);
+    response["id"] = get_row_text(stmt, 0);
+    response["avatar_id"] = get_row_text(stmt, 1);
+    response["owner"] = get_row_text(stmt, 2);
+    response["platform"] = get_row_text(stmt, 3);
+    response["description"] = get_row_text(stmt, 4);
+    response["issues_count"] = GET_ROW_UL(stmt, 5);
+    response["default_branch_name"] = get_row_text(stmt, 6);
+    response["fork_count"] = GET_ROW_UL(stmt, 7);
+    response["stargazer_count"] = GET_ROW_UL(stmt, 8);
+    response["watchers_count"] = GET_ROW_UL(stmt, 9);
+    response["pushed_at"] = get_row_text(stmt, 10);
+    response["created_at"] = get_row_text(stmt, 11);
+    response["is_archived"] = GET_ROW_UL(stmt, 12) != 0;
+    response["is_disabled"] = GET_ROW_UL(stmt, 13) != 0;
+    response["is_fork"] = GET_ROW_UL(stmt, 14) != 0;
+    response["license"] = get_row_text(stmt, 15);
+    response["primary_language"] = get_row_text(stmt, 16);
 
-    std::string id = get_row_text(row, 0);
+    std::string id = get_row_text(stmt, 0);
 
     std::stringstream ss(id);
     std::string provider;
@@ -89,6 +88,8 @@ crow::response package_details(const crow::request& req)
         response["repo_name"] = repo;
     }
 
+    sqlite3_finalize(stmt);
+
     {
         crow::json::wvalue::list releases;
 
@@ -99,22 +100,20 @@ crow::response package_details(const crow::request& req)
             ORDER BY published_at DESC
         )";
 
-        auto stmt2 = libsql_connection_prepare(
-            database_connection,
-            releases_query.c_str());
+        sqlite3_stmt* stmt2 = nullptr;
+        sqlite3_prepare_v2(database_connection, releases_query.c_str(), -1, &stmt2, nullptr);
+        sqlite3_bind_text(stmt2, 1, repo_id, strlen(repo_id), SQLITE_TRANSIENT);
 
-        libsql_statement_bind_value(
-            stmt2,
-            libsql_text(repo_id, strlen(repo_id)));
-
-        auto rows2 = libsql_statement_query(stmt2);
-
-        for (auto r = libsql_rows_next(rows2);
-            !libsql_row_empty(r);
-            r = libsql_rows_next(rows2)) {
-            releases.push_back(get_row_text(r, 0));
+        while (true) {
+            int r = sqlite3_step(stmt2);
+            if (r == SQLITE_DONE)
+                break;
+            if (r != SQLITE_ROW)
+                break;
+            releases.push_back(get_row_text(stmt2, 0));
         }
 
+        sqlite3_finalize(stmt2);
         response["releases"] = std::move(releases);
     }
 
@@ -127,22 +126,20 @@ crow::response package_details(const crow::request& req)
             WHERE repo_id = ?
         )";
 
-        auto stmt3 = libsql_connection_prepare(
-            database_connection,
-            dependents_query.c_str());
+        sqlite3_stmt* stmt3 = nullptr;
+        sqlite3_prepare_v2(database_connection, dependents_query.c_str(), -1, &stmt3, nullptr);
+        sqlite3_bind_text(stmt3, 1, repo_id, strlen(repo_id), SQLITE_TRANSIENT);
 
-        libsql_statement_bind_value(
-            stmt3,
-            libsql_text(repo_id, strlen(repo_id)));
-
-        auto rows3 = libsql_statement_query(stmt3);
-
-        for (auto r = libsql_rows_next(rows3);
-            !libsql_row_empty(r);
-            r = libsql_rows_next(rows3)) {
-            dependents.push_back(get_row_text(r, 0));
+        while (true) {
+            int r = sqlite3_step(stmt3);
+            if (r == SQLITE_DONE)
+                break;
+            if (r != SQLITE_ROW)
+                break;
+            dependents.push_back(get_row_text(stmt3, 0));
         }
 
+        sqlite3_finalize(stmt3);
         response["dependents"] = std::move(dependents);
     }
 
@@ -180,40 +177,34 @@ crow::response package_details(const crow::request& req)
         )";
     }
 
-    auto stmt4 = libsql_connection_prepare(
-        database_connection,
-        release_query.c_str());
-
-    libsql_statement_bind_value(
-        stmt4,
-        libsql_text(repo_id, strlen(repo_id)));
+    sqlite3_stmt* stmt4 = nullptr;
+    sqlite3_prepare_v2(database_connection, release_query.c_str(), -1, &stmt4, nullptr);
+    sqlite3_bind_text(stmt4, 1, repo_id, strlen(repo_id), SQLITE_TRANSIENT);
 
     if (has_version) {
-        libsql_statement_bind_value(
-            stmt4,
-            libsql_text(version, strlen(version)));
+        sqlite3_bind_text(stmt4, 2, version, strlen(version), SQLITE_TRANSIENT);
     }
 
-    auto rows4 = libsql_statement_query(stmt4);
-    auto release_row = libsql_rows_next(rows4);
+    int release_step = sqlite3_step(stmt4);
+    bool release_row_empty = (release_step == SQLITE_DONE);
 
-    if (!libsql_row_empty(release_row)) {
+    if (!release_row_empty) {
 
-        long release_id = GET_ROW_UL(release_row, 0);
+        long release_id = GET_ROW_UL(stmt4, 0);
 
-        response["version"] = has_version ? get_row_text(release_row, 1) : "0.0.0";
+        response["version"] = has_version ? get_row_text(stmt4, 1) : "0.0.0";
 
-        response["latest_version"] = has_version ? "" : get_row_text(release_row, 1);
+        response["latest_version"] = has_version ? "" : get_row_text(stmt4, 1);
 
-        response["published_at"] = get_row_text(release_row, 2);
+        response["published_at"] = get_row_text(stmt4, 2);
 
-        auto min_zig = get_row_text(release_row, 3);
+        auto min_zig = get_row_text(stmt4, 3);
 
         response["minimum_zig_version"] = min_zig.empty() ? "0.0.0" : min_zig;
 
-        response["readme_url"] = get_row_text(release_row, 4);
-        response["is_prerelease"] = GET_ROW_UL(release_row, 5) != 0;
-        response["directory_files"] = get_row_text(release_row, 6);
+        response["readme_url"] = get_row_text(stmt4, 4);
+        response["is_prerelease"] = GET_ROW_UL(stmt4, 5) != 0;
+        response["directory_files"] = get_row_text(stmt4, 6);
 
         crow::json::wvalue::list deps;
 
@@ -228,32 +219,32 @@ crow::response package_details(const crow::request& req)
             WHERE release_id = ?
         )";
 
-        auto stmt5 = libsql_connection_prepare(
-            database_connection,
-            dep_query.c_str());
+        sqlite3_stmt* stmt5 = nullptr;
+        sqlite3_prepare_v2(database_connection, dep_query.c_str(), -1, &stmt5, nullptr);
+        sqlite3_bind_int64(stmt5, 1, release_id);
 
-        libsql_statement_bind_value(
-            stmt5,
-            libsql_integer(release_id));
-
-        auto rows5 = libsql_statement_query(stmt5);
-
-        for (auto dep_row = libsql_rows_next(rows5);
-            !libsql_row_empty(dep_row);
-            dep_row = libsql_rows_next(rows5)) {
+        while (true) {
+            int r = sqlite3_step(stmt5);
+            if (r == SQLITE_DONE)
+                break;
+            if (r != SQLITE_ROW)
+                break;
             crow::json::wvalue dep;
 
-            dep["name"] = get_row_text(dep_row, 0);
-            dep["url"] = get_row_text(dep_row, 1);
-            dep["hash"] = get_row_text(dep_row, 2);
-            dep["lazy"] = GET_ROW_UL(dep_row, 3) != 0;
-            dep["path"] = get_row_text(dep_row, 4);
+            dep["name"] = get_row_text(stmt5, 0);
+            dep["url"] = get_row_text(stmt5, 1);
+            dep["hash"] = get_row_text(stmt5, 2);
+            dep["lazy"] = GET_ROW_UL(stmt5, 3) != 0;
+            dep["path"] = get_row_text(stmt5, 4);
 
             deps.push_back(std::move(dep));
         }
 
+        sqlite3_finalize(stmt5);
         response["dependencies"] = std::move(deps);
     }
+
+    sqlite3_finalize(stmt4);
 
     return crow::response(response);
 }

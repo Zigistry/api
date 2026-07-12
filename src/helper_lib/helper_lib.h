@@ -1,16 +1,17 @@
 #include <iostream>
 #include <mutex>
+#include <sqlite3.h>
 
 #include "../../include/crow_all.h"
-#include "../../include/libsql.h"
 #include <expected>
 
 extern std::mutex db_mutex;
+extern sqlite3* database_connection;
 
-#define GET_ROW_UL(A, B) ((unsigned int)libsql_row_value((A), (B)).ok.value.integer)
-#define GET_ROW_BOOL(A, B) ((bool)libsql_row_value((A), (B)).ok.value.integer)
+#define GET_ROW_UL(A, B) ((unsigned int)sqlite3_column_int64((A), (B)))
+#define GET_ROW_BOOL(A, B) ((bool)sqlite3_column_int64((A), (B)))
 
-std::string get_row_text(libsql_row_t row, int col);
+std::string get_row_text(sqlite3_stmt* stmt, int col);
 std::string adv_tokenizer(std::string s, char del, int index);
 std::expected<crow::json::wvalue, std::string> special_parsing(std::string query);
 
