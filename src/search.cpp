@@ -1,6 +1,47 @@
 #include "./helper_lib/helper_lib.h"
+#include <unordered_map>
 
 extern sqlite3* database_connection;
+
+const std::unordered_map<std::string, std::string> sort_to_sql = {
+    { "stars", "r.stargazer_count" },
+    { "dependents", "we.dependents_count" },
+    { "recently_updated", "r.pushed_at" },
+    { "newly_added", "r.created_at" },
+    { "name", "r.id" },
+    { "forks", "r.fork_count" },
+    { "issues", "r.issues_count" },
+    { "zig_version", "we.minimum_zig_version" }
+};
+
+std::string sorting_parameter_adder_to_query(const char* raw_sort, const char* raw_dir)
+{
+    std::string sort = raw_sort ? raw_sort : "intelligent";
+    std::string dir = raw_dir ? raw_dir : "desc";
+    
+    if (dir != "asc") {
+        dir = "desc";
+    }
+
+    for (char& c : sort) {
+        c = std::tolower(c);
+    }
+
+    for (char& c : dir) {
+        c = std::tolower(c);
+    }
+
+    if (sort == "intelligent") {
+        return "";
+    }
+
+
+    if (!sort_to_sql.contains(sort)) {
+        return "";
+    }
+
+    return "ORDER BY " + sort_to_sql.at(sort) + " " + dir;
+}
 
 crow::response search(const crow::request& req, const std::string query_str)
 {
@@ -9,6 +50,8 @@ crow::response search(const crow::request& req, const std::string query_str)
     const char* raw_search_query = req.url_params.get("q");
     const char* raw_page = req.url_params.get("page");
     const char* raw_per_page = req.url_params.get("per_page");
+    const char* raw_sort = req.url_params.get("sort");
+    const char* raw_dir = req.url_params.get("dir");
 
     if (raw_search_query == NULL or raw_page == NULL or raw_per_page == NULL) {
         crow::json::wvalue error_responce;
@@ -41,8 +84,13 @@ crow::response search(const crow::request& req, const std::string query_str)
     search_query += "*";
     const unsigned long offset = (page - 1) * per_page;
 
+    std::string order_clause = sorting_parameter_adder_to_query(raw_sort, raw_dir);
+
+    std::string final_query = query_str;
+    final_query.replace(final_query.find("__INSERT_SORT_HERE__"), 16, order_clause);
+
     sqlite3_stmt* query_stmt = nullptr;
-    int rc = sqlite3_prepare_v2(database_connection, query_str.c_str(), -1, &query_stmt, nullptr);
+    int rc = sqlite3_prepare_v2(database_connection, final_query.c_str(), -1, &query_stmt, nullptr);
 
     if (rc != SQLITE_OK) {
         std::cout << sqlite3_errstr(rc) << std::endl;
