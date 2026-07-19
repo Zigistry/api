@@ -87,7 +87,7 @@ crow::response search(const crow::request& req, const std::string query_str)
     std::string order_clause = sorting_parameter_adder_to_query(raw_sort, raw_dir);
 
     std::string final_query = query_str;
-    final_query.replace(final_query.find("__INSERT_SORT_HERE__"), 16, order_clause);
+    final_query.replace(final_query.find("__INSERT_SORT_HERE__"), 20, order_clause);
 
     sqlite3_stmt* query_stmt = nullptr;
     int rc = sqlite3_prepare_v2(database_connection, final_query.c_str(), -1, &query_stmt, nullptr);
