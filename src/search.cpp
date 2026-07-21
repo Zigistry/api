@@ -52,6 +52,7 @@ crow::response search(const crow::request& req, const std::string query_str)
     const char* raw_per_page = req.url_params.get("per_page");
     const char* raw_sort = req.url_params.get("sort");
     const char* raw_dir = req.url_params.get("dir");
+    const char* raw_topic = req.url_params.get("topic");
 
     if (raw_search_query == NULL or raw_page == NULL or raw_per_page == NULL) {
         crow::json::wvalue error_responce;
@@ -81,13 +82,39 @@ crow::response search(const crow::request& req, const std::string query_str)
         return crow::response(error_responce);
     }
 
-    search_query += "*";
+    bool has_search_query = !search_query.empty();
+    if (has_search_query) {
+        search_query += "*";
+    }
     const unsigned long offset = (page - 1) * per_page;
 
     std::string order_clause = sorting_parameter_adder_to_query(raw_sort, raw_dir);
 
+    std::string fts_filter = has_search_query
+        ? "AND r.id IN (SELECT repo_id FROM repo_search WHERE keywords MATCH ?)"
+        : "AND 1=1";
+
+    std::string topic_filter = "AND 1=1";
+    std::string topic_value;
+    bool has_topic = false;
+    if (raw_topic != NULL) {
+        topic_value = raw_topic;
+        if (!topic_value.empty() && topic_value.size() <= 60) {
+            topic_filter = "AND EXISTS (SELECT 1 FROM repo_topics rt WHERE rt.repo_id = r.id AND rt.topic = ?)";
+            has_topic = true;
+        }
+    }
+
+    if (!has_search_query && !has_topic) {
+        crow::json::wvalue error_responce;
+        error_responce["error"] = "At least one of q or topic is required.";
+        return crow::response(error_responce);
+    }
+
     std::string final_query = query_str;
     final_query.replace(final_query.find("__INSERT_SORT_HERE__"), 20, order_clause);
+    final_query.replace(final_query.find("__INSERT_TOPIC_FILTER_HERE__"), 28, topic_filter);
+    final_query.replace(final_query.find("__INSERT_FTS_FILTER_HERE__"), 26, fts_filter);
 
     sqlite3_stmt* query_stmt = nullptr;
     int rc = sqlite3_prepare_v2(database_connection, final_query.c_str(), -1, &query_stmt, nullptr);
@@ -101,7 +128,30 @@ crow::response search(const crow::request& req, const std::string query_str)
     }
 
     int bind_rc;
-    bind_rc = sqlite3_bind_text(query_stmt, 1, search_query.c_str(), search_query.length(), SQLITE_TRANSIENT);
+    int next_param = 1;
+    if (has_search_query) {
+        bind_rc = sqlite3_bind_text(query_stmt, next_param++, search_query.c_str(), search_query.length(), SQLITE_TRANSIENT);
+        if (bind_rc != SQLITE_OK) {
+            std::cout << sqlite3_errstr(bind_rc) << std::endl;
+            sqlite3_finalize(query_stmt);
+            crow::json::wvalue error_responce;
+            error_responce["error"] = "Problem with server. 1";
+            return crow::response(error_responce);
+        }
+    }
+
+    if (has_topic) {
+        bind_rc = sqlite3_bind_text(query_stmt, next_param++, topic_value.c_str(), topic_value.length(), SQLITE_TRANSIENT);
+        if (bind_rc != SQLITE_OK) {
+            std::cout << sqlite3_errstr(bind_rc) << std::endl;
+            sqlite3_finalize(query_stmt);
+            crow::json::wvalue error_responce;
+            error_responce["error"] = "Problem with server. 1";
+            return crow::response(error_responce);
+        }
+    }
+
+    bind_rc = sqlite3_bind_int64(query_stmt, next_param++, (sqlite3_int64)per_page);
     if (bind_rc != SQLITE_OK) {
         std::cout << sqlite3_errstr(bind_rc) << std::endl;
         sqlite3_finalize(query_stmt);
@@ -110,16 +160,7 @@ crow::response search(const crow::request& req, const std::string query_str)
         return crow::response(error_responce);
     }
 
-    bind_rc = sqlite3_bind_int64(query_stmt, 2, (sqlite3_int64)per_page);
-    if (bind_rc != SQLITE_OK) {
-        std::cout << sqlite3_errstr(bind_rc) << std::endl;
-        sqlite3_finalize(query_stmt);
-        crow::json::wvalue error_responce;
-        error_responce["error"] = "Problem with server. 1";
-        return crow::response(error_responce);
-    }
-
-    bind_rc = sqlite3_bind_int64(query_stmt, 3, (sqlite3_int64)offset);
+    bind_rc = sqlite3_bind_int64(query_stmt, next_param++, (sqlite3_int64)offset);
     if (bind_rc != SQLITE_OK) {
         std::cout << sqlite3_errstr(bind_rc) << std::endl;
         sqlite3_finalize(query_stmt);

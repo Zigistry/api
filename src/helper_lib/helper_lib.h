@@ -22,7 +22,8 @@ const std::string search_packages_database_query = R"""(
                 FROM repos r
                 WHERE r.is_disabled = 0
                   AND EXISTS (SELECT 1 FROM packages p WHERE p.repo_id = r.id)
-                  AND r.id IN (SELECT repo_id FROM repo_search WHERE keywords MATCH ?)
+                  __INSERT_FTS_FILTER_HERE__
+                  __INSERT_TOPIC_FILTER_HERE__
             ),
             with_extras AS MATERIALIZED (
                 SELECT
@@ -60,7 +61,8 @@ const std::string search_programs_database_query = R"""(
                 FROM repos r
                 WHERE r.is_disabled = 0
                   AND EXISTS (SELECT 1 FROM programs p WHERE p.repo_id = r.id)
-                  AND r.id IN (SELECT repo_id FROM repo_search WHERE keywords MATCH ?)
+                  __INSERT_FTS_FILTER_HERE__
+                  __INSERT_TOPIC_FILTER_HERE__
             ),
             with_extras AS MATERIALIZED (
                 SELECT

@@ -23,6 +23,7 @@ int main()
     std::cout << "Connected..." << std::endl;
 
     crow::App<crow::CORSHandler> app;
+    app.loglevel(crow::LogLevel::Warning);
 
     auto& cors = app.get_middleware<crow::CORSHandler>();
     cors.global()
