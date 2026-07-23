@@ -82,7 +82,8 @@ crow::response search(const crow::request& req, const std::string query_str)
         return crow::response(error_responce);
     }
 
-    bool has_search_query = !search_query.empty();
+    bool is_match_all = (search_query == "*");
+    bool has_search_query = !search_query.empty() && !is_match_all;
     if (has_search_query) {
         search_query += "*";
     }
@@ -105,7 +106,7 @@ crow::response search(const crow::request& req, const std::string query_str)
         }
     }
 
-    if (!has_search_query && !has_topic) {
+    if (!has_search_query && !has_topic && !is_match_all) {
         crow::json::wvalue error_responce;
         error_responce["error"] = "At least one of q or topic is required.";
         return crow::response(error_responce);
