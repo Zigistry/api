@@ -102,8 +102,8 @@ crow::response get_user_route(const crow::request& req)
                 FROM repo_dependents
                 WHERE repo_id = r.id
             ) AS dependents_count,
-            pkg.repo_id AS is_package,
-            prog.repo_id AS is_program
+            (CASE WHEN pkg.repo_id IS NOT NULL THEN 1 ELSE 0 END) AS is_package,
+            (CASE WHEN prog.repo_id IS NOT NULL THEN 1 ELSE 0 END) AS is_program
         FROM repos r
         LEFT JOIN users u ON r.owner = u.id
         LEFT JOIN packages pkg ON r.id = pkg.repo_id
@@ -165,8 +165,6 @@ crow::response get_user_route(const crow::request& req)
         item["id"] = id;
 
         std::string provider = get_row_text(fetch_user_repos_query_stmt, 3);
-
-        item["id"] = get_row_text(fetch_user_stmt, 0);
         item["avatar_url"] = get_row_text(fetch_user_repos_query_stmt, 1);
         item["owner_name"] = get_row_text(fetch_user_repos_query_stmt, 2);
         item["owner"] = get_row_text(fetch_user_repos_query_stmt, 2);

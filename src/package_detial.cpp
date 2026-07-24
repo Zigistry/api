@@ -64,7 +64,7 @@ crow::response package_details(const crow::request& req)
     response["description"] = get_row_text(stmt, 4);
     response["issues_count"] = GET_ROW_UL(stmt, 5);
     response["default_branch_name"] = get_row_text(stmt, 6);
-    response["fork_count"] = GET_ROW_UL(stmt, 7);
+    response["forks_count"] = GET_ROW_UL(stmt, 7);
     response["stargazer_count"] = GET_ROW_UL(stmt, 8);
     response["watchers_count"] = GET_ROW_UL(stmt, 9);
     response["pushed_at"] = get_row_text(stmt, 10);
